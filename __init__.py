@@ -1,3 +1,14 @@
+
+
+import sys
+import bpy
+import xml.sax
+import zipfile
+import os
+
+from bpy_extras.node_shader_utils import PrincipledBSDFWrapper
+
+
 bl_info = {
     "name": "FreeCAD Importer",
     "category": "Import-Export",
@@ -22,32 +33,28 @@ bl_info = {
 # v5.0.0 - 13 august 2019 - small fixes and better info messages if things go wrong
 
 
-import sys, bpy, xml.sax, zipfile, os
-
-from bpy_extras.node_shader_utils import PrincipledBSDFWrapper
-
 # set to True to triangulate all faces (will loose multimaterial info)
 TRIANGULATE = False
 
+
 class FreeCAD_xml_handler(xml.sax.ContentHandler):
+    """
+    A XML handler to process the FreeCAD GUI xml data.
 
-    """A XML handler to process the FreeCAD GUI xml data"""
-
-    # this creates a dictionary where each key is a FC object name,
-    # and each value is a dictionary of property:value pairs
+    this creates a dictionary where each key is a FC object name,
+    and each value is a dictionary of property:value pairs
+    """
 
     def __init__(self):
-
+        """Init."""
         self.guidata = {}
         self.current = None
         self.properties = {}
         self.currentprop = None
         self.currentval = None
 
-    # Call when an element starts
-
     def startElement(self, tag, attributes):
-
+        """Call when an element starts."""
         if tag == "ViewProvider":
             self.current = attributes["name"]
         elif tag == "Property":
@@ -61,10 +68,10 @@ class FreeCAD_xml_handler(xml.sax.ContentHandler):
                 self.currentval = False
         elif tag == "PropertyColor":
             c = int(attributes["value"])
-            r = float((c>>24)&0xFF)/255.0
-            g = float((c>>16)&0xFF)/255.0
-            b = float((c>>8)&0xFF)/255.0
-            self.currentval = (r,g,b)
+            r = float((c >> 24) & 0xFF)/255.0
+            g = float((c >> 16) & 0xFF)/255.0
+            b = float((c >> 8) & 0xFF)/255.0
+            self.currentval = (r, g, b)
         elif tag == "Integer":
             self.currentval = int(attributes["value"])
         elif tag == "Float":
@@ -72,17 +79,15 @@ class FreeCAD_xml_handler(xml.sax.ContentHandler):
         elif tag == "ColorList":
             self.currentval = attributes["file"]
 
-    # Call when an elements ends
-
     def endElement(self, tag):
-
+        """Call when an elements ends."""
         if tag == "ViewProvider":
             if self.current and self.properties:
                 self.guidata[self.current] = self.properties
                 self.current = None
                 self.properties = {}
         elif tag == "Property":
-            if self.currentprop and (self.currentval != None):
+            if self.currentprop and (self.currentval is not None):
                 self.properties[self.currentprop] = self.currentval
                 self.currentprop = None
                 self.currentval = None
@@ -96,9 +101,7 @@ def import_fcstd(filename,
                  scale=1.0,
                  sharemats=True,
                  report=None):
-
-    """Reads a FreeCAD .FCStd file and creates Blender objects"""
-
+    """Read a FreeCAD .FCStd file and creates Blender objects."""
     try:
         # append the FreeCAD path specified in addon preferences
         user_preferences = bpy.context.preferences
@@ -107,18 +110,25 @@ def import_fcstd(filename,
         if path:
             if os.path.isfile(path):
                 path = os.path.dirname(path)
-            print("Configured FreeCAD path:",path)
+            print("Configured FreeCAD path:", path)
             sys.path.append(path)
         else:
             print("FreeCAD path is not configured in preferences")
         import FreeCAD
     except:
-        print("Unable to import the FreeCAD Python module. Make sure it is installed on your system")
+        print(
+            "Unable to import the FreeCAD Python module. "
+            "Make sure it is installed on your system")
         print("and compiled with Python3 (same version as Blender).")
-        print("It must also be found by Python, you might need to set its path in this Addon preferences")
+        print(
+            "It must also be found by Python, "
+            "you might need to set its path in this Addon preferences")
         print("(User preferences->Addons->expand this addon).")
         if report:
-            report({'ERROR'},"Unable to import the FreeCAD Python module. Check Addon preferences.")
+            report(
+                {'ERROR'},
+                "Unable to import the FreeCAD Python module. "
+                "Check Addon preferences.")
         return {'CANCELLED'}
     # check if we have a GUI document
     guidata = {}
@@ -131,29 +141,31 @@ def import_fcstd(filename,
             Handler = FreeCAD_xml_handler()
             xml.sax.parseString(guidata, Handler)
             guidata = Handler.guidata
-            for key,properties in guidata.items():
+            for key, properties in guidata.items():
                 # open each diffusecolor files and retrieve values
-                # first 4 bytes are the array length, then each group of 4 bytes is abgr
+                # first 4 bytes are the array length,
+                # then each group of 4 bytes is abgr
                 if "DiffuseColor" in properties:
-                    #print ("opening:",guidata[key]["DiffuseColor"])
+                    # print ("opening:",guidata[key]["DiffuseColor"])
                     df = zdoc.open(guidata[key]["DiffuseColor"])
                     buf = df.read()
-                    #print (buf," length ",len(buf))
+                    # print (buf," length ",len(buf))
                     df.close()
                     cols = []
-                    for i in range(1,int(len(buf)/4)):
-                        cols.append((buf[i*4+3],buf[i*4+2],buf[i*4+1],buf[i*4]))
+                    for i in range(1, int(len(buf)/4)):
+                        cols.append(
+                            (buf[i*4+3], buf[i*4+2], buf[i*4+1], buf[i*4]))
                     guidata[key]["DiffuseColor"] = cols
         zdoc.close()
-        #print ("guidata:",guidata)
+        # print ("guidata:",guidata)
     doc = FreeCAD.open(filename)
     docname = doc.Name
     if not doc:
         print("Unable to open the given FreeCAD file")
         if report:
-            report({'ERROR'},"Unable to open the given FreeCAD file")
+            report({'ERROR'}, "Unable to open the given FreeCAD file")
         return {'CANCELLED'}
-    #print ("Transferring",len(doc.Objects),"objects to Blender")
+    # print ("Transferring",len(doc.Objects),"objects to Blender")
 
     # import some FreeCAD modules needed below. After "import FreeCAD" these modules become available
     import Part
@@ -161,30 +173,33 @@ def import_fcstd(filename,
     def hascurves(shape):
 
         for e in shape.Edges:
-            if not isinstance(e.Curve,(Part.Line,Part.LineSegment)):
+            if not isinstance(e.Curve, (Part.Line, Part.LineSegment)):
                 return True
         return False
 
-    matdatabase = {} # to store reusable materials
+    # to store reusable materials
+    matdatabase = {}
 
     fcstd_collection = bpy.data.collections.new("FreeCAD import")
     bpy.context.scene.collection.children.link(fcstd_collection)
 
     for obj in doc.Objects:
-        #print("Importing",obj.Label)
+        # print("Importing",obj.Label)
         if skiphidden:
             if obj.Name in guidata:
                 if "Visibility" in guidata[obj.Name]:
-                    if guidata[obj.Name]["Visibility"] == False:
-                        #print(obj.Label,"is invisible. Skipping.")
+                    if guidata[obj.Name]["Visibility"] is False:
+                        # print(obj.Label,"is invisible. Skipping.")
                         continue
 
         verts = []
         edges = []
         faces = []
-        matindex = [] # face to material relationship
+        # face to material relationship
+        matindex = []
         plac = None
-        faceedges = [] # a placeholder to store edges that belong to a face
+        # a placeholder to store edges that belong to a face
+        faceedges = []
         name = "Unnamed"
 
         if obj.isDerivedFrom("Part::Feature"):
@@ -199,7 +214,7 @@ def import_fcstd(filename,
                     # triangulate and make faces
                     rawdata = shape.tessellate(tessellation)
                     for v in rawdata[0]:
-                        verts.append([v.x,v.y,v.z])
+                        verts.append([v.x, v.y, v.z])
                     for f in rawdata[1]:
                         faces.append(f)
                     for face in shape.Faces:
@@ -208,25 +223,29 @@ def import_fcstd(filename,
                 else:
                     # write FreeCAD faces as polygons when possible
                     for face in shape.Faces:
-                        if (len(face.Wires) > 1) or (not isinstance(face.Surface,Part.Plane)) or hascurves(face):
+                        if (
+                            (len(face.Wires) > 1)
+                            or (not isinstance(face.Surface, Part.Plane))
+                            or hascurves(face)
+                        ):
                             # face has holes or is curved, so we need to triangulate it
                             rawdata = face.tessellate(tessellation)
                             for v in rawdata[0]:
-                                vl = [v.x,v.y,v.z]
+                                vl = [v.x, v.y, v.z]
                                 if not vl in verts:
                                     verts.append(vl)
                             for f in rawdata[1]:
                                 nf = []
                                 for vi in f:
                                     nv = rawdata[0][vi]
-                                    nf.append(verts.index([nv.x,nv.y,nv.z]))
+                                    nf.append(verts.index([nv.x, nv.y, nv.z]))
                                 faces.append(nf)
                             matindex.append(len(rawdata[1]))
                         else:
                             f = []
                             ov = face.OuterWire.OrderedVertexes
                             for v in ov:
-                                vl = [v.X,v.Y,v.Z]
+                                vl = [v.X, v.Y, v.Z]
                                 if not vl in verts:
                                     verts.append(vl)
                                 f.append(verts.index(vl))
@@ -234,9 +253,10 @@ def import_fcstd(filename,
                             c = face.CenterOfMass
                             v1 = ov[0].Point.sub(c)
                             v2 = ov[1].Point.sub(c)
-                            n = face.normalAt(0,0)
+                            n = face.normalAt(0, 0)
                             if (v1.cross(v2)).getAngle(n) > 1.57:
-                                f.reverse() # inverting verts order if the direction is couterclockwise
+                                # inverting verts order if the direction is couterclockwise
+                                f.reverse()
                             faces.append(f)
                             matindex.append(1)
                         for e in face.Edges:
@@ -245,20 +265,21 @@ def import_fcstd(filename,
                 # Treat remaining edges (that are not in faces)
                 if not (edge.hashCode() in faceedges):
                     if hascurves(edge):
-                        dv = edge.discretize(9) #TODO use tessellation value
+                        # TODO use tessellation value
+                        dv = edge.discretize(9)
                         for i in range(len(dv)-1):
-                            dv1 = [dv[i].x,dv[i].y,dv[i].z]
-                            dv2 = [dv[i+1].x,dv[i+1].y,dv[i+1].z]
+                            dv1 = [dv[i].x, dv[i].y, dv[i].z]
+                            dv2 = [dv[i+1].x, dv[i+1].y, dv[i+1].z]
                             if not dv1 in verts:
                                 verts.append(dv1)
                             if not dv2 in verts:
                                 verts.append(dv2)
-                            edges.append([verts.index(dv1),verts.index(dv2)])
+                            edges.append([verts.index(dv1), verts.index(dv2)])
                     else:
                         e = []
                         for vert in edge.Vertexes:
                             # TODO discretize non-linear edges
-                            v = [vert.X,vert.Y,vert.Z]
+                            v = [vert.X, vert.Y, vert.Z]
                             if not v in verts:
                                 verts.append(v)
                             e.append(verts.index(v))
@@ -269,9 +290,10 @@ def import_fcstd(filename,
             mesh = obj.Mesh
             if placement:
                 placement = obj.Placement
-                mesh = obj.Mesh.copy() # in meshes, this zeroes the placement
+                # in meshes, this zeroes the placement
+                mesh = obj.Mesh.copy()
             t = mesh.Topology
-            verts = [[v.x,v.y,v.z] for v in t[0]]
+            verts = [[v.x, v.y, v.z] for v in t[0]]
             faces = t[1]
 
         if verts and (faces or edges):
@@ -283,7 +305,7 @@ def import_fcstd(filename,
                 for o in bpy.data.objects:
                     if o.data.name == obj.Name:
                         bobj = o
-                        print("Replacing existing object:",obj.Label)
+                        print("Replacing existing object:", obj.Label)
             bmesh = bpy.data.meshes.new(name=obj.Name)
             bmesh.from_pydata(verts, edges, faces)
             bmesh.update()
@@ -294,7 +316,7 @@ def import_fcstd(filename,
                 # create new object
                 bobj = bpy.data.objects.new(obj.Label, bmesh)
                 if placement:
-                    #print ("placement:",placement)
+                    # print ("placement:",placement)
                     bobj.location = placement.Base.multiply(scale)
                     m = bobj.rotation_mode
                     bobj.rotation_mode = 'QUATERNION'
@@ -303,9 +325,13 @@ def import_fcstd(filename,
                         q = (placement.Rotation.Q[3],)+placement.Rotation.Q[:3]
                         bobj.rotation_quaternion = (q)
                         bobj.rotation_mode = m
-                    bobj.scale = (scale,scale,scale)
+                    bobj.scale = (scale, scale, scale)
                 if obj.Name in guidata:
-                    if matindex and ("DiffuseColor" in guidata[obj.Name]) and (len(matindex) == len(guidata[obj.Name]["DiffuseColor"])):
+                    if (
+                        matindex
+                        and ("DiffuseColor" in guidata[obj.Name])
+                        and (len(matindex) == len(guidata[obj.Name]["DiffuseColor"]))
+                    ):
                         # we have per-face materials. Create new mats and attribute faces to them
                         fi = 0
                         objmats = []
@@ -346,7 +372,7 @@ def import_fcstd(filename,
                     else:
                         # one material for the whole object
                         alpha = 1.0
-                        rgb = (0.5,0.5,0.5)
+                        rgb = (0.5, 0.5, 0.5)
                         if "Transparency" in guidata[obj.Name]:
                             if guidata[obj.Name]["Transparency"] > 0:
                                 alpha = (100-guidata[obj.Name]["Transparency"])/100.0
@@ -358,14 +384,14 @@ def import_fcstd(filename,
                             if rgba in matdatabase:
                                 bmat = matdatabase[rgba]
                             else:
-                                #print("not found in db:",rgba,"in",matdatabase)
+                                # print("not found in db:",rgba,"in",matdatabase)
                                 pass
                         if not bmat:
                             bmat = bpy.data.materials.new(name=obj.Name)
                             # no more internal engine!
                             # bmat.diffuse_color = rgb
                             # bmat.alpha = alpha
-                            #if enablenodes:
+                            # if enablenodes:
                             bmat.use_nodes = True
                             principled = PrincipledBSDFWrapper(bmat, is_readonly=False)
                             principled.base_color = rgb
@@ -376,13 +402,13 @@ def import_fcstd(filename,
                         bobj.data.materials.append(bmat)
 
             fcstd_collection.objects.link(bobj)
-            #bpy.context.scene.objects.active = obj
-            #obj.select = True
+            # bpy.context.scene.objects.active = obj
+            # obj.select = True
 
     FreeCAD.closeDocument(docname)
 
     # why is this here? I don't remember. It doesn't seem to work anymore anyway...
-    #for area in bpy.context.screen.areas:
+    # for area in bpy.context.screen.areas:
     #    if area.type == 'VIEW_3D':
     #        for region in area.regions:
     #            if region.type == 'WINDOW':
@@ -393,15 +419,13 @@ def import_fcstd(filename,
     return {'FINISHED'}
 
 
-
-#==============================================================================
+# ==============================================================================
 # Blender Operator class
-#==============================================================================
+# ==============================================================================
 
 
 class IMPORT_OT_FreeCAD(bpy.types.Operator):
-
-    """Imports the contents of a FreeCAD .FCStd file"""
+    """Imports the contents of a FreeCAD .FCStd file."""
 
     bl_idname = 'import_fcstd.import_freecad'
     bl_label = 'Import FreeCAD FCStd file'
@@ -412,37 +436,61 @@ class IMPORT_OT_FreeCAD(bpy.types.Operator):
 
     # Properties assigned by the file selection window.
 
-    directory : bpy.props.StringProperty(maxlen=1024, subtype='FILE_PATH', options={'HIDDEN', 'SKIP_SAVE'})
-    files : bpy.props.CollectionProperty(type=bpy.types.OperatorFileListElement, options={'HIDDEN', 'SKIP_SAVE'})
-    option_skiphidden : bpy.props.BoolProperty(name="Skip hidden objects", default=True,
+    directory: bpy.props.StringProperty(
+        maxlen=1024,
+        subtype='FILE_PATH',
+        options={'HIDDEN', 'SKIP_SAVE'}
+    )
+    files: bpy.props.CollectionProperty(
+        type=bpy.types.OperatorFileListElement,
+        options={'HIDDEN', 'SKIP_SAVE'}
+    )
+    option_skiphidden: bpy.props.BoolProperty(
+        name="Skip hidden objects",
+        default=True,
         description="Only import objects that where visible in FreeCAD"
     )
-    option_update : bpy.props.BoolProperty(name="Update existing objects", default=True,
-        description="Keep objects with same names in current scene and their materials, only replace the geometry"
+    option_update: bpy.props.BoolProperty(
+        name="Update existing objects",
+        default=True,
+        description=(
+            "Keep objects with same names in current scene and "
+            "their materials, only replace the geometry"
+        )
     )
-    option_placement : bpy.props.BoolProperty(name="Use Placements", default=True,
+    option_placement: bpy.props.BoolProperty(
+        name="Use Placements",
+        default=True,
         description="Set Blender pivot points to the FreeCAD placements"
     )
-    option_tessellation : bpy.props.FloatProperty(name="Tessellation value", default=1.0,
+    option_tessellation: bpy.props.FloatProperty(
+        name="Tessellation value",
+        default=1.0,
         description="The tessellation value to apply when triangulating shapes"
     )
-    option_scale : bpy.props.FloatProperty(name="Scaling value", default=0.001,
-        description="A scaling value to apply to imported objects. Default value of 0.001 means one Blender unit = 1 meter"
+    option_scale: bpy.props.FloatProperty(
+        name="Scaling value",
+        default=0.001,
+        description=(
+            "A scaling value to apply to imported objects. "
+            "Default value of 0.001 means one Blender unit = 1 meter"
+        )
     )
-    option_sharemats : bpy.props.BoolProperty(name="Share similar materials", default=True,
-        description="Objects with same color/transparency will use the same material"
+    option_sharemats: bpy.props.BoolProperty(
+        name="Share similar materials",
+        default=True,
+        description=(
+            "Objects with same color/transparency will use the same material"
+        )
     )
-
-    # invoke is called when the user picks our Import menu entry.
 
     def invoke(self, context, event):
+        """Invoke is called when the user picks our Import menu entry."""
         context.window_manager.fileselect_add(self)
         return {'RUNNING_MODAL'}
 
-    # execute is called when the user is done using the modal file-select window.
-
     def execute(self, context):
-
+        """Call when the user is done using the modal file-select window."""
         dir = self.directory
         for file in self.files:
             filestr = str(file.name)
@@ -459,41 +507,43 @@ class IMPORT_OT_FreeCAD(bpy.types.Operator):
 
 
 class IMPORT_OT_FreeCAD_Preferences(bpy.types.AddonPreferences):
-
-
-    """A preferences settings dialog to set the path to the FreeCAD module"""
+    """A preferences settings dialog to set the path to the FreeCAD module."""
 
     bl_idname = __name__
 
-    filepath : bpy.props.StringProperty(
+    filepath: bpy.props.StringProperty(
             name="Path to FreeCAD.so (Mac/Linux) or FreeCAD.pyd (Windows)",
             subtype='FILE_PATH',
             )
 
     def draw(self, context):
+        """Draw Preferences."""
         layout = self.layout
-        layout.label(text="FreeCAD must be installed on your system, and its path set below. Make sure both FreeCAD and Blender use the same Python version (check their Python console)")
+        layout.label(text=(
+            "FreeCAD must be installed on your system, and its path set below."
+            " Make sure both FreeCAD and Blender use the same Python version "
+            "(check their Python console)"
+        ))
         layout.prop(self, "filepath")
 
 
-#==============================================================================
+# ==============================================================================
 # Register plugin with Blender
-#==============================================================================
+# ==============================================================================
 
 classes = (
     IMPORT_OT_FreeCAD,
     IMPORT_OT_FreeCAD_Preferences,
-    )
+)
 
-# needed if you want to add into a dynamic menu
 
 def menu_func_import(self, context):
-
+    """Needed if you want to add into a dynamic menu."""
     self.layout.operator(IMPORT_OT_FreeCAD.bl_idname, text="FreeCAD (.FCStd)")
 
 
 def register():
-
+    """Register."""
     from bpy.utils import register_class
     for cls in classes:
         register_class(cls)
@@ -501,7 +551,7 @@ def register():
 
 
 def unregister():
-
+    """Unregister."""
     from bpy.utils import unregister_class
     for cls in reversed(classes):
         unregister_class(cls)
