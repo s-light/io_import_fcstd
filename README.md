@@ -8,13 +8,12 @@ based on gist [yorikvanhavre/FreeCAD .FCStd importer for Blender 2.80](https://g
 
 # description
 
-This script imports FreeCAD .FCStd files into Blender.
-This is a work in progress,
-so not all geometry elements of FreeCAD might be supported at this point.
+This script imports FreeCAD .FCStd files into Blender.  
+This is a work in progress, so not all geometry elements of FreeCAD
+might be supported at this point.
 
-The development of this addon happens on the FreeCAD forum at
-[https://forum.freecadweb.org](https://forum.freecadweb.org)
-(no thread yet, please create one ;) !)
+The development of this addon happens on the FreeCAD forum at  
+[FreeCAD .FCStd importer for Blender 2.80](https://forum.freecadweb.org/viewtopic.php?f=22&t=39778)
 
 # warning
 
