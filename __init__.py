@@ -1,6 +1,5 @@
 
 
-
 import bpy
 
 from . import import_fcstd
@@ -60,6 +59,11 @@ class IMPORT_OT_FreeCAD(bpy.types.Operator):
         default=True,
         description="Only import objects that where visible in FreeCAD"
     )
+    option_filter_sketch: bpy.props.BoolProperty(
+        name="Filter Sketch objects",
+        default=True,
+        description="Filter Sketch objects out."
+    )
     option_update: bpy.props.BoolProperty(
         name="Update existing objects",
         default=True,
@@ -110,6 +114,7 @@ class IMPORT_OT_FreeCAD(bpy.types.Operator):
                     placement=self.option_placement,
                     tessellation=self.option_tessellation,
                     skiphidden=self.option_skiphidden,
+                    filter_sketch=self.option_filter_sketch,
                     scale=self.option_scale,
                     sharemats=self.option_sharemats,
                     report=self.report
