@@ -17,6 +17,14 @@ The development of this addon happens on the FreeCAD forum at
 
 # warning
 
+this is currently only tested with 0.19 / daily-builds on linux 64bit.
+if you want to try, please use a build from
+[0.19_pre](https://github.com/FreeCAD/FreeCAD/releases/tag/0.19_pre)
+or newer...
+
+
+# warning
+
 This addon requires FreeCAD to be installed on your system.  
 A word of warning, your version of FreeCAD must be compiled
 with the same version of python as Blender.
