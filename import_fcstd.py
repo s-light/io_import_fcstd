@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 
 import sys
 import bpy
@@ -66,29 +68,6 @@ class FreeCAD_xml_handler(xml.sax.ContentHandler):
                 self.currentprop = None
                 self.currentval = None
 
-
-#####
-# typeid_filter_list = [
-#     'App::Line',
-#     'App::Plane',
-#     'App::Origin',
-#     # 'GeoFeature',
-#     # 'PartDesign::CoordinateSystem',
-#     'Sketcher::SketchObject',
-# ]
-# for obj in doc.Objects:
-#     if obj.TypeId not in typeid_filter_list:
-#         print(
-#             "import_obj: {:<25} {:<15} {:<30}"
-#             "".format(obj.TypeId, obj.Name, obj.Label),
-#             end=''
-#         )
-#         print(obj.InList, end='')
-#         print("  ", end='')
-#         print(obj.OutList, end='')
-#         print("  ", end='')
-#         print(obj.Parents)
-#####
 
 class ImportFcstd(object):
     """Import fcstd files."""
@@ -456,6 +435,41 @@ class ImportFcstd(object):
             #             result = False
         return result
 
+    # @static
+    def print_obj_header():
+        print(
+            "     {:<25} {:<15} {:<25}"
+            "".format("TypeId", "Name", "Label"),
+            end=''
+        )
+        print("[Parents]", end='')
+        print("  ", end='')
+        print("[InList]", end='')
+        print("  ", end='')
+        print("[OutList]", end='')
+        print("  ", end='')
+        print()
+
+    def get_root_objects(self, doc):
+        root_objects = []
+        for obj in doc.Objects:
+            if obj.TypeId not in self.typeid_filter_list:
+                print(
+                    "import_obj: {:<25} {:<15} {:<25}"
+                    "".format(obj.TypeId, obj.Name, obj.Label),
+                    end=''
+                )
+                print(obj.Parents, end='')
+                print("  ", end='')
+                print(obj.InList, end='')
+                print("  ", end='')
+                print(obj.OutList, end='')
+                print("  ", end='')
+                print()
+                if (len(obj.Parents) == 0):
+                    root_objects.append(obj)
+        return root_objects
+
     def import_doc_content(self, doc):
         for obj in doc.Objects:
             if obj.TypeId not in self.typeid_filter_list:
@@ -583,3 +597,12 @@ class ImportFcstd(object):
             FreeCAD.closeDocument(docname)
         print("Import finished without errors")
         return {'FINISHED'}
+
+
+def main_test():
+    "Main Tests."
+    pass
+
+
+if __name__ == '__main__':
+    main_test()
