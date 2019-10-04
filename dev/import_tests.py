@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-FreeCAD & Blender Tests
+Import Tests
 
 this script can be called from commandline or from within blender.
 therefore we need some heavy tricks with the sys.path..
@@ -10,6 +10,7 @@ therefore we need some heavy tricks with the sys.path..
 
 import sys
 import os
+import importlib
 
 try:
     import bpy
@@ -36,15 +37,12 @@ if bpy:
 base_dir = os.path.realpath(base_dir)
 print("base_dir", base_dir)
 
-
 # Adds base_dir to python modules path.
 if base_dir not in sys.path:
     sys.path.append(base_dir)
-
 # print("sys.path:")
 # for p in sys.path:
 #     print(p)
-import freecad_helper  # noqa
 
 
 # fallback path to FreeCAD daily
@@ -87,6 +85,10 @@ except ModuleNotFoundError as e:
 #     print("FreeCAD Workbench import failed:", e)
 
 
+import freecad_helper  # noqa
+importlib.reload(freecad_helper)
+
+
 # ******************************************
 #
 #            Main experimetns
@@ -100,7 +102,11 @@ def run_tests(doc):
 
     print("~"*42)
     print("get_root_objects")
-    freecad_helper.print_objects(freecad_helper.get_root_objects(doc))
+    objects = freecad_helper.get_root_objects(
+        doc,
+        filter_list=['Sketcher::SketchObject', ]
+    )
+    freecad_helper.print_objects(objects)
 
     print("~"*42)
     print("doc.RootObjects")

@@ -57,12 +57,13 @@ def get_filtered_objects(doc, typeid_filter_list=None):
     return result_objects
 
 
-def get_root_objects(doc):
+def get_root_objects(doc, filter_list=[]):
     typeid_filter_list = [
         'App::Line',
         'App::Plane',
         'App::Origin',
     ]
+    typeid_filter_list = typeid_filter_list + filter_list
     result_objects = []
     for obj in doc.Objects:
         if obj.TypeId not in typeid_filter_list:
