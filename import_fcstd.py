@@ -86,6 +86,7 @@ class ImportFcstd(object):
         filter_sketch=True,
         scale=0.001,
         sharemats=True,
+        update_materials=False,
         obj_name_prefix="",
         report=None
     ):
@@ -99,6 +100,7 @@ class ImportFcstd(object):
             "filter_sketch": filter_sketch,
             "scale": scale,
             "sharemats": sharemats,
+            "update_materials": update_materials,
             "obj_name_prefix": obj_name_prefix,
             "report": self.print_report,
         }
@@ -121,6 +123,14 @@ class ImportFcstd(object):
 
     def get_obj_label(self, obj):
         return self.config["obj_name_prefix"] + obj.Label
+
+    def rename_old_data(self, data, data_label):
+        if data_label in data:
+            name_old = data[data_label].name + "_old"
+            if name_old in data:
+                # rename recusive..
+                self.rename_old_data(data, name_old)
+            data[data_label].name = name_old
 
     # material
     def get_obj_Transparency(self, obj_Name):
@@ -221,7 +231,7 @@ class ImportFcstd(object):
             bmat = self.create_new_bmat(bmat_name, rgba, func_data)
         bobj.data.materials.append(bmat)
 
-    def handle_material(self, func_data, bobj):
+    def handle_material_new(self, func_data, bobj):
         # check if we have a material at all...
         if func_data["obj"].Name in self.guidata:
             # check if we have 'per face' or 'object' coloring.
@@ -237,14 +247,6 @@ class ImportFcstd(object):
                 self.handle_material_single(func_data, bobj)
 
     # object handling
-    def rename_old_mesh(self, obj_label):
-        if obj_label in bpy.data.meshes:
-            name_old = bpy.data.meshes[obj_label].name + "_old"
-            if name_old in bpy.data.meshes:
-                # rename recusive..
-                self.rename_old_mesh(name_old)
-            bpy.data.meshes[obj_label].name = name_old
-
     def hascurves(self, shape):
         """Check if shape has curves."""
         import Part
@@ -280,17 +282,13 @@ class ImportFcstd(object):
         bobj = None
         obj_label = self.get_obj_label(func_data["obj"])
         if self.config["update"]:
-            # locate existing object (mesh with same name)
-            for o in bpy.data.objects:
-                # print(
-                #     "check for update: '{}' → '{}'"
-                #     "".format(o.data.name, obj_label)
-                # )
-                if o.data.name == obj_label:
-                    bobj = o
-                    print("Replacing existing object:", obj_label)
+            # locate existing object (object with same name)
+            if obj_label in bpy.data.objects:
+                bobj = bpy.data.objects[obj_label]
+                print("Replacing existing object mesh:", obj_label)
+                # rename old mesh - this way the new mesh can get the orig. name.
+                self.rename_old_data(bpy.data.meshes, obj_label)
 
-        self.rename_old_mesh(obj_label)
         bmesh = bpy.data.meshes.new(name=obj_label)
         bmesh.from_pydata(
             func_data["verts"],
@@ -299,13 +297,17 @@ class ImportFcstd(object):
         )
         bmesh.update()
         if bobj:
-            # update only the mesh of existing object. Don't touch materials
+            # update only the mesh of existing object.
+            # copy old materials to new mesh:
+            for mat in bobj.data.materials:
+                bmesh.materials.append(mat)
             bobj.data = bmesh
+            # self.handle_material_update(func_data, bobj)
         else:
             # create new object
             bobj = bpy.data.objects.new(obj_label, bmesh)
             self.handle_placement(bobj)
-            self.handle_material(func_data, bobj)
+            self.handle_material_new(func_data, bobj)
 
         if self.config['update']:
             if bobj.name not in self.fcstd_collection.objects:
