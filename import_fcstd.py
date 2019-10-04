@@ -7,7 +7,7 @@ import xml.sax
 import zipfile
 import os
 
-import freecad_helper as fc_helper
+from . import freecad_helper as fc_helper
 
 
 from bpy_extras.node_shader_utils import PrincipledBSDFWrapper
@@ -144,89 +144,118 @@ class ImportFcstd(object):
                 self.config["scale"]
             )
 
-    def handle_material(self, obj, bobj, matindex, matdatabase):
+    def get_obj_Transparency(self, obj_Name):
+        alpha = 1.0
+        if "Transparency" in self.guidata[obj_Name]:
+            if self.guidata[obj_Name]["Transparency"] > 0:
+                alpha = (100 - self.guidata[obj_Name]["Transparency"]) / 100.0
+        return alpha
+
+    def get_obj_ShapeColor(self, obj_Name):
+        rgb = (0.5, 0.5, 0.5)
+        if "ShapeColor" in self.guidata[obj_Name]:
+            rgb = self.guidata[obj_Name]["ShapeColor"]
+        return rgb
+
+    def get_obj_DiffuseColor(self, obj_Name, i):
+        # DiffuseColor stores int values, Blender use floats
+        rgba = tuple([
+            float(x) / 255.0
+            for x in self.guidata[obj_Name]["DiffuseColor"][i]
+        ])
+        return rgba
+
+    def get_obj_rgba(self, obj_Name, mat_index=None):
+        if mat_index:
+            rgba = self.get_obj_DiffuseColor(obj_Name, mat_index)
+            # FreeCAD stores transparency, not alpha
+            alpha = 1.0
+            if rgba[3] > 0:
+                alpha = 1.0 - rgba[3]
+            rgba = rgba[:3] + (alpha,)
+        else:
+            alpha = self.get_obj_Transparency(obj_Name)
+            rgb = self.get_obj_ShapeColor(obj_Name)
+            rgba = rgb+(alpha,)
+        return rgba
+
+    def create_new_bmat(self, bmat_name, rgba, func_data):
+        bmat = bpy.data.materials.new(name=bmat_name)
+        bmat.use_nodes = True
+        # link bmat to PrincipledBSDFWrapper
+        principled = PrincipledBSDFWrapper(bmat, is_readonly=False)
+        principled.base_color = rgba[:3]
+        # check for alpha
+        if rgba[3] < 1.0:
+            bmat.diffuse_color = rgba
+            principled.alpha = rgba[3]
+            bmat.blend_method = "BLEND"
+        if self.config["sharemats"]:
+            func_data["matdatabase"][rgba] = bmat
+        return bmat
+
+    def handle_material_per_face(self, func_data, bobj, fi, objmats, i):
+        # Create new mats and attribute faces to them
+        # DiffuseColor stores int values, Blender use floats
+        rgba = self.get_obj_rgba(func_data["obj"].Name, i)
         bmat = None
-        if (
-            matindex
-            and ("DiffuseColor" in self.guidata[obj.Name])
-            and (len(matindex) == len(
-                self.guidata[obj.Name]["DiffuseColor"])
-            )
-        ):
-            # we have per-face materials.
-            # Create new mats and attribute faces to them
-            fi = 0
-            objmats = []
-            for i in range(len(matindex)):
-                # DiffuseColor stores int values, Blender use floats
-                rgba = tuple([
-                    float(x)/255.0
-                    for x in self.guidata[obj.Name]["DiffuseColor"][i]
-                ])
-                # FreeCAD stores transparency, not alpha
-                alpha = 1.0
-                if rgba[3] > 0:
-                    alpha = 1.0-rgba[3]
-                rgba = rgba[:3]+(alpha,)
-                bmat = None
-                if self.config["sharemats"]:
-                    if rgba in matdatabase:
-                        bmat = matdatabase[rgba]
-                        if rgba not in objmats:
-                            objmats.append(rgba)
-                            bobj.data.materials.append(bmat)
-                if not bmat:
-                    if rgba in objmats:
-                        bmat = bobj.data.materials[objmats.index(rgba)]
-                if not bmat:
-                    bmat = bpy.data.materials.new(
-                        name=obj.Name+str(len(objmats)))
-                    bmat.use_nodes = True
-                    principled = PrincipledBSDFWrapper(
-                        bmat, is_readonly=False)
-                    principled.base_color = rgba[:3]
-                    if alpha < 1.0:
-                        bmat.diffuse_color = rgba
-                        principled.alpha = alpha
-                        bmat.blend_method = "BLEND"
+        if self.config["sharemats"]:
+            if rgba in func_data["matdatabase"]:
+                bmat = func_data["matdatabase"][rgba]
+                if rgba not in objmats:
                     objmats.append(rgba)
                     bobj.data.materials.append(bmat)
-                    if self.config["sharemats"]:
-                        matdatabase[rgba] = bmat
-                for fj in range(matindex[i]):
-                    bobj.data.polygons[fi+fj].material_index = objmats.index(rgba)
-                fi += matindex[i]
-        else:
-            # one material for the whole object
-            alpha = 1.0
-            rgb = (0.5, 0.5, 0.5)
-            if "Transparency" in self.guidata[obj.Name]:
-                if self.guidata[obj.Name]["Transparency"] > 0:
-                    alpha = (100-self.guidata[obj.Name]["Transparency"])/100.0
-            if "ShapeColor" in self.guidata[obj.Name]:
-                rgb = self.guidata[obj.Name]["ShapeColor"]
-            rgba = rgb+(alpha,)
-            bmat = None
-            if self.config["sharemats"]:
-                if rgba in matdatabase:
-                    bmat = matdatabase[rgba]
-                else:
-                    # print("not found in db:",rgba,"in",matdatabase)
-                    pass
-            if not bmat:
-                bmat = bpy.data.materials.new(name=obj.Name)
-                # no more internal engine!
-                # bmat.diffuse_color = rgb
-                # bmat.alpha = alpha
-                # if enablenodes:
-                bmat.use_nodes = True
-                principled = PrincipledBSDFWrapper(bmat, is_readonly=False)
-                principled.base_color = rgb
-                if alpha < 1.0:
-                    bmat.diffuse_color = rgba
-                if self.config["sharemats"]:
-                    matdatabase[rgba] = bmat
+        if not bmat:
+            if rgba in objmats:
+                bmat = bobj.data.materials[objmats.index(rgba)]
+        if not bmat:
+            bmat_name = func_data["obj"].Name+str(len(objmats))
+            bmat = self.create_new_bmat(bmat_name, rgba, func_data)
+            objmats.append(rgba)
+            # TODO: please check if this is really correct..
             bobj.data.materials.append(bmat)
+
+        # assigne materials to polygons
+        for fj in range(func_data["matindex"][i]):
+            bobj.data.polygons[fi+fj].material_index = objmats.index(rgba)
+        fi += func_data["matindex"][i]
+
+    def handle_material_multi(self, func_data, bobj):
+        # we have per-face materials.
+        fi = 0
+        objmats = []
+        for i in range(len(func_data["matindex"])):
+            self.handle_material_per_face(func_data, bobj, fi, objmats, i)
+
+    def handle_material_single(self, func_data, bobj):
+        # one material for the whole object
+        rgba = self.get_obj_rgba(func_data["obj"].Name)
+        bmat = None
+        if self.config["sharemats"]:
+            if rgba in func_data["matdatabase"]:
+                bmat = func_data["matdatabase"][rgba]
+            else:
+                # print("not found in db:",rgba,"in",matdatabase)
+                pass
+        if not bmat:
+            bmat_name = func_data["obj"].Name
+            bmat = self.create_new_bmat(bmat_name, rgba, func_data)
+        bobj.data.materials.append(bmat)
+
+    def handle_material(self, func_data, bobj):
+        # check if we have a material at all...
+        if func_data["obj"].Name in self.guidata:
+            # check if we have 'per face' or 'object' coloring.
+            if (
+                func_data["matindex"]
+                and ("DiffuseColor" in self.guidata[func_data["obj"].Name])
+                and (len(func_data["matindex"]) == len(
+                    self.guidata[func_data["obj"].Name]["DiffuseColor"])
+                )
+            ):
+                self.handle_material_multi(func_data, bobj)
+            else:
+                self.handle_material_single(func_data, bobj)
 
     def add_or_update_blender_obj(self, func_data):
         """Create or update object with mesh and material data."""
@@ -251,13 +280,7 @@ class ImportFcstd(object):
             # create new object
             bobj = bpy.data.objects.new(func_data["obj"].Label, bmesh)
             self.handle_placement(bobj)
-            if func_data["obj"].Name in self.guidata:
-                self.handle_material(
-                    func_data["obj"],
-                    bobj,
-                    func_data["matindex"],
-                    func_data["matdatabase"]
-                )
+            self.handle_material(func_data, bobj)
 
         # TODO: on update: check if already there
         if self.config['update']:
@@ -400,19 +423,16 @@ class ImportFcstd(object):
         # elif obj.isDerivedFrom("PartDesign::Feature"):
         #     self.create_mesh_from_PartDesign(func_data)
         else:
+            error_messagae = (
+                "Unable to load {} of type {}. Not implemented yet."
+                "".format(obj.Label, obj.TypeId)
+            )
+            print(error_messagae)
             if self.config["report"]:
-                self.config["report"](
-                    {'ERROR'},
-                    "Unable to load {} of type {}. Not implemented yet."
-                    "".format(obj.Label, obj.TypeId)
-                )
+                self.config["report"]({'ERROR'}, error_messagae)
 
         if func_data["verts"] and (func_data["faces"] or func_data["edges"]):
             self.add_or_update_blender_obj(func_data)
-        # END import_obj
-
-    # def check_visibility_recusiv(self, obj):
-    #     result = self.check_visibility_recusiv(obj.Parents)
 
     def check_visibility(self, obj):
         """Check if obj is visible."""
@@ -424,41 +444,23 @@ class ImportFcstd(object):
         ):
             if self.guidata[obj.Name]["Visibility"] is False:
                 result = False
-            # else:
-            #     if obj.TypeId not in self.typeid_filter_list:
-            #         # check if a parent is invisible...
-            #         # for obj_parent in obj.Parents:
-            #         #     pass
-            #         # result = self.check_visibility_recusiv()
-            #         if (
-            #             len(obj.Parents) > 0
-            #             and "Visibility" in obj.Parents[0]
-            #             and obj.Parents[0].Visibility is False
-            #         ):
-            #             result = False
         return result
 
     def import_doc_content(self, doc):
-        fc_helper.print_objects(fc_helper.get_root_objects)
-
-        for obj in doc.Objects:
-            if obj.TypeId not in self.typeid_filter_list:
-                print(
-                    "import_obj: {:<25} {:<15} {:<25}"
-                    "".format(obj.TypeId, obj.Name, obj.Label),
-                    end=''
-                )
-                print(obj.InList, end='')
-                print("  ", end='')
-                print(obj.OutList, end='')
-                print("  ", end='')
-                print(obj.Parents)
-                if self.check_visibility(obj):
-                    print("  →  import.")
-                    self.import_obj(obj)
-                else:
-                    # print(" → invisible Skipping.")
-                    print("  →  skipping.")
+        obj_list = fc_helper.get_filtered_objects(doc, self.typeid_filter_list)
+        fc_helper.print_objects(obj_list)
+        print("-"*21)
+        for obj in obj_list:
+            print(
+                "{:<15} {:<25}"
+                "".format(obj.Name, obj.Label),
+                end=''
+            )
+            if self.check_visibility(obj):
+                print("  →  import.")
+                self.import_obj(obj)
+            else:
+                print("  →  skipping.")
 
     def prepare_collection(self):
         # TODO: on update: check if already there
@@ -560,7 +562,10 @@ class ImportFcstd(object):
                 self.prepare_collection()
                 self.import_doc_content(doc)
         except Exception as e:
-            self.config["report"]({'ERROR'}, str(e))
+            error_messagae = str(e)
+            # print(error_messagae)
+            if self.config["report"]:
+                self.config["report"]({'ERROR'}, error_messagae)
             raise e
         finally:
             # FreeCAD.closeDocument('Linking')

@@ -40,15 +40,16 @@ def print_objects(objects):
 
 # ****************************************
 
-def get_filtered_objects(doc):
-    typeid_filter_list = [
-        'App::Line',
-        'App::Plane',
-        'App::Origin',
-        # 'GeoFeature',
-        # 'PartDesign::CoordinateSystem',
-        # 'Sketcher::SketchObject',
-    ]
+def get_filtered_objects(doc, typeid_filter_list=None):
+    if typeid_filter_list is None:
+        typeid_filter_list = [
+            'App::Line',
+            'App::Plane',
+            'App::Origin',
+            # 'GeoFeature',
+            # 'PartDesign::CoordinateSystem',
+            # 'Sketcher::SketchObject',
+        ]
     result_objects = []
     for obj in doc.Objects:
         if obj.TypeId not in typeid_filter_list:
