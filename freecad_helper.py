@@ -4,31 +4,31 @@
 
 def print_obj_header():
     print(
-        "     {:<25} {:<15} {:<25}"
-        "".format("TypeId", "Name", "Label"),
+        "     {:<15} {:<25} {:<25} "
+        "".format("Name", "Label", "TypeId"),
         end=''
     )
     print("[Parents]", end='')
-    print("  ", end='')
+    print("    ", end='')
     print("[InList]", end='')
-    print("  ", end='')
+    print("    ", end='')
     print("[OutList]", end='')
-    print("  ", end='')
+    print("    ", end='')
     print()
 
 
 def print_obj(obj):
     print(
-        "obj: {:<25} {:<15} {:<25}"
-        "".format(obj.TypeId, obj.Name, obj.Label),
+        "obj: {:<15} {:<25} {:<25}"
+        "".format(obj.Name, obj.Label, obj.TypeId),
         end=''
     )
     print(obj.Parents, end='')
-    print("  ", end='')
+    print("    ", end='')
     print(obj.InList, end='')
-    print("  ", end='')
+    print("    ", end='')
     print(obj.OutList, end='')
-    print("  ", end='')
+    print("    ", end='')
     print()
 
 

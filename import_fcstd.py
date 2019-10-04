@@ -450,17 +450,14 @@ class ImportFcstd(object):
         obj_list = fc_helper.get_filtered_objects(doc, self.typeid_filter_list)
         fc_helper.print_objects(obj_list)
         print("-"*21)
+        print("import:")
         for obj in obj_list:
-            print(
-                "{:<15} {:<25}"
-                "".format(obj.Name, obj.Label),
-                end=''
-            )
             if self.check_visibility(obj):
-                print("  →  import.")
+                print(
+                    "→ {:<15} {:<25}"
+                    "".format(obj.Name, obj.Label)
+                )
                 self.import_obj(obj)
-            else:
-                print("  →  skipping.")
 
     def prepare_collection(self):
         # TODO: on update: check if already there

@@ -107,8 +107,8 @@ def run_tests(doc):
     freecad_helper.print_objects(doc.RootObjects)
 
     print("~"*42)
-    print("getTopLevelObjects")
-    freecad_helper.print_objects(freecad_helper.getTopLevelObjects(doc))
+    print("get_toplevel_objects")
+    freecad_helper.print_objects(freecad_helper.get_toplevel_objects(doc))
 
     print("~"*42)
     print("tests done :-)")
