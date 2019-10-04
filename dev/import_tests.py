@@ -12,9 +12,12 @@ import sys
 import os
 import importlib
 
+print("$"*42)
+print("import_tests.py")
+print("$"*42)
+
 try:
     import bpy
-    print("\n"*2)
 except ModuleNotFoundError as e:
     print("Blender 'bpy' not available.", e)
     bpy = None
@@ -30,16 +33,25 @@ if bpy:
     script_dir = os.path.realpath(temp_path)
 script_dir = os.path.realpath(script_dir)
 print("script_dir", script_dir)
+if script_dir not in sys.path:
+    sys.path.append(script_dir)
 
 base_dir = ".."
 if bpy:
     base_dir = os.path.join(script_dir, "..")
 base_dir = os.path.realpath(base_dir)
 print("base_dir", base_dir)
-
-# Adds base_dir to python modules path.
 if base_dir not in sys.path:
     sys.path.append(base_dir)
+
+outside_package_dir = ".."
+if bpy:
+    outside_package_dir = os.path.join(base_dir, "..")
+outside_package_dir = os.path.realpath(outside_package_dir)
+print("outside_package_dir", outside_package_dir)
+if outside_package_dir not in sys.path:
+    sys.path.append(outside_package_dir)
+
 # print("sys.path:")
 # for p in sys.path:
 #     print(p)
@@ -84,10 +96,11 @@ except ModuleNotFoundError as e:
 # except ModuleNotFoundError as e:
 #     print("FreeCAD Workbench import failed:", e)
 
-
-import freecad_helper  # noqa
-importlib.reload(freecad_helper)
-
+print("*"*42)
+print("from io_import_fcstd import import_fcstd")
+# pylama:ignore=E402
+from io_import_fcstd import import_fcstd
+importlib.reload(import_fcstd)
 
 # ******************************************
 #
@@ -95,62 +108,55 @@ importlib.reload(freecad_helper)
 #
 # ******************************************
 
-def run_tests(doc):
-    print("~"*42)
-    print("get_filtered_objects")
-    freecad_helper.print_objects(freecad_helper.get_filtered_objects(doc))
-
-    print("~"*42)
-    print("get_root_objects")
-    objects = freecad_helper.get_root_objects(
-        doc,
-        filter_list=['Sketcher::SketchObject', ]
-    )
-    freecad_helper.print_objects(objects)
-
-    print("~"*42)
-    print("doc.RootObjects")
-    freecad_helper.print_objects(doc.RootObjects)
-
-    print("~"*42)
-    print("get_toplevel_objects")
-    freecad_helper.print_objects(freecad_helper.get_toplevel_objects(doc))
-
-    print("~"*42)
-    print("tests done :-)")
+# def run_tests(doc):
+#     print("~"*42)
+#     print("get_filtered_objects")
+#     freecad_helper.print_objects(freecad_helper.get_filtered_objects(doc))
+#
+#     print("~"*42)
+#     print("get_root_objects")
+#     objects = freecad_helper.get_root_objects(
+#         doc,
+#         filter_list=['Sketcher::SketchObject', ]
+#     )
+#     freecad_helper.print_objects(objects)
+#
+#     print("~"*42)
+#     print("doc.RootObjects")
+#     freecad_helper.print_objects(doc.RootObjects)
+#
+#     print("~"*42)
+#     print("get_toplevel_objects")
+#     freecad_helper.print_objects(freecad_helper.get_toplevel_objects(doc))
+#
+#     print("~"*42)
+#     print("tests done :-)")
 
 
 # ******************************************
 def main_test():
     "Main Tests."
-    if bpy:
-        print("\n"*2)
     print("*"*42)
     print("run import_tests")
 
-    # Context Managers not implemented..
-    # see https://docs.python.org/3.8/reference/compound_stmts.html#with
-    # with FreeCAD.open(self.config["filename"]) as doc:
-    # so we use the classic try finally block:
-    docname = ""
-    try:
-        filename_relative = "./dev/freecad_linking_example/assembly.FCStd"
-        print("FreeCAD document:", filename_relative)
-        filename = os.path.join(base_dir, filename_relative)
-        doc = FreeCAD.open(filename)
-        docname = doc.Name
-        if not doc:
-            print("Unable to open the given FreeCAD file")
-        else:
-            run_tests(doc)
-    except Exception as e:
-        raise e
-    finally:
-        if docname:
-            FreeCAD.closeDocument(docname)
-        print("*"*42)
-        if bpy:
-            print("\n"*2)
+    filename_relative = "./dev/freecad_linking_example/assembly.FCStd"
+    print("FreeCAD document:", filename_relative)
+    filename = os.path.join(base_dir, filename_relative)
+
+    my_importer = import_fcstd.ImportFcstd(
+        # update=self.option_update,
+        # placement=self.option_placement,
+        # tessellation=self.option_tessellation,
+        # skiphidden=self.option_skiphidden,
+        # filter_sketch=self.option_filter_sketch,
+        # scale=self.option_scale,
+        # sharemats=self.option_sharemats,
+        # report=self.report
+    )
+    my_importer.import_fcstd(filename=filename)
+
+    if bpy:
+        print("\n"*2)
 
 
 if __name__ == '__main__':

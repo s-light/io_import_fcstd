@@ -8,6 +8,7 @@ import zipfile
 import os
 
 from . import freecad_helper as fc_helper
+from . import blender_helper as b_helper
 
 
 from bpy_extras.node_shader_utils import PrincipledBSDFWrapper
@@ -82,9 +83,10 @@ class ImportFcstd(object):
         placement=True,
         tessellation=1.0,
         skiphidden=True,
-        filter_sketch=False,
-        scale=1.0,
+        filter_sketch=True,
+        scale=0.001,
         sharemats=True,
+        obj_name_prefix="",
         report=None
     ):
         super(ImportFcstd, self).__init__()
@@ -97,22 +99,25 @@ class ImportFcstd(object):
             "filter_sketch": filter_sketch,
             "scale": scale,
             "sharemats": sharemats,
-            "report": report,
+            "obj_name_prefix": obj_name_prefix,
+            "report": self.print_report,
         }
+        self.report = report
+
         print('config', self.config)
         self.guidata = {}
         self.fcstd_collection = None
         self.doc_filename = None
 
         self.typeid_filter_list = [
-            'App::Line',
-            'App::Plane',
-            'App::Origin',
-            # 'GeoFeature',
-            # 'PartDesign::CoordinateSystem',
+            'GeoFeature',
+            'PartDesign::CoordinateSystem',
         ]
         if self.config['filter_sketch']:
             self.typeid_filter_list.append('Sketcher::SketchObject')
+
+    def print_report(self, mode, data):
+        b_helper.print_multi(mode, data, self.report)
 
     def hascurves(self, shape):
         """Check if shape has curves."""
@@ -143,6 +148,9 @@ class ImportFcstd(object):
                 self.config["scale"],
                 self.config["scale"]
             )
+
+    def get_obj_label(self, obj):
+        return self.config["obj_name_prefix"] + obj.Label
 
     def get_obj_Transparency(self, obj_Name):
         alpha = 1.0
@@ -209,7 +217,7 @@ class ImportFcstd(object):
             if rgba in objmats:
                 bmat = bobj.data.materials[objmats.index(rgba)]
         if not bmat:
-            bmat_name = func_data["obj"].Name+str(len(objmats))
+            bmat_name = self.get_obj_label(func_data["obj"]) + "_" + str(len(objmats))
             bmat = self.create_new_bmat(bmat_name, rgba, func_data)
             objmats.append(rgba)
             # TODO: please check if this is really correct..
@@ -238,7 +246,7 @@ class ImportFcstd(object):
                 # print("not found in db:",rgba,"in",matdatabase)
                 pass
         if not bmat:
-            bmat_name = func_data["obj"].Name
+            bmat_name = self.get_obj_label(func_data["obj"])
             bmat = self.create_new_bmat(bmat_name, rgba, func_data)
         bobj.data.materials.append(bmat)
 
@@ -260,13 +268,18 @@ class ImportFcstd(object):
     def add_or_update_blender_obj(self, func_data):
         """Create or update object with mesh and material data."""
         bobj = None
+        obj_label = self.get_obj_label(func_data["obj"])
         if self.config["update"]:
             # locate existing object (mesh with same name)
             for o in bpy.data.objects:
-                if o.data.name == func_data["obj"].Name:
+                # print(
+                #     "check for update: '{}' → '{}'"
+                #     "".format(o.data.name, obj_label)
+                # )
+                if o.data.name == obj_label:
                     bobj = o
-                    print("Replacing existing object:", func_data["obj"].Label)
-        bmesh = bpy.data.meshes.new(name=func_data["obj"].Name)
+                    print("Replacing existing object:", obj_label)
+        bmesh = bpy.data.meshes.new(name=obj_label)
         bmesh.from_pydata(
             func_data["verts"],
             func_data["edges"],
@@ -278,7 +291,7 @@ class ImportFcstd(object):
             bobj.data = bmesh
         else:
             # create new object
-            bobj = bpy.data.objects.new(func_data["obj"].Label, bmesh)
+            bobj = bpy.data.objects.new(obj_label, bmesh)
             self.handle_placement(bobj)
             self.handle_material(func_data, bobj)
 
@@ -423,13 +436,10 @@ class ImportFcstd(object):
         # elif obj.isDerivedFrom("PartDesign::Feature"):
         #     self.create_mesh_from_PartDesign(func_data)
         else:
-            error_messagae = (
-                "Unable to load {} of type {}. Not implemented yet."
-                "".format(obj.Label, obj.TypeId)
-            )
-            print(error_messagae)
-            if self.config["report"]:
-                self.config["report"]({'ERROR'}, error_messagae)
+            self.config["report"]({'WARNING'}, (
+                "Unable to load '{}' ('{}') of type '{}'. (Type Not implemented yet)."
+                "".format(obj.Label, obj.Name, obj.TypeId)
+            ))
 
         if func_data["verts"] and (func_data["faces"] or func_data["edges"]):
             self.add_or_update_blender_obj(func_data)
@@ -447,10 +457,16 @@ class ImportFcstd(object):
         return result
 
     def import_doc_content(self, doc):
-        obj_list = fc_helper.get_filtered_objects(doc, self.typeid_filter_list)
+        obj_list = fc_helper.get_root_objects(
+            doc,
+            filter_list=self.typeid_filter_list
+        )
         fc_helper.print_objects(obj_list)
         print("-"*21)
-        print("import:")
+        self.config["report"]({'INFO'}, (
+            "import {} objects.."
+            "".format(len(obj_list))
+        ))
         for obj in obj_list:
             if self.check_visibility(obj):
                 print(
@@ -517,22 +533,19 @@ class ImportFcstd(object):
         try:
             self.prepare_freecad_import()
             import FreeCAD
-        # except ModuleNotFoundError:
-        except Exception:
-            print(
+        # except ModuleNotFoundError as e:
+        except Exception as e:
+            self.config["report"](
+                {'ERROR'},
                 "Unable to import the FreeCAD Python module. \n"
+                "\n"
                 "Make sure it is installed on your system"
                 "and compiled with Python3 (same version as Blender).\n"
                 "It must also be found by Python, "
                 "you might need to set its path in this Addon preferences"
-                "(User preferences->Addons->expand this addon)."
+                "(User preferences->Addons->expand this addon).\n"
+                + str(e)
             )
-            if self.config["report"]:
-                self.config["report"](
-                    {'ERROR'},
-                    "Unable to import the FreeCAD Python module. "
-                    "Check Addon preferences."
-                )
             return {'CANCELLED'}
 
         self.load_guidata()
@@ -547,22 +560,18 @@ class ImportFcstd(object):
             docname = doc.Name
             self.doc_filename = docname + ".FCStd"
             if not doc:
-                print("Unable to open the given FreeCAD file")
-                if self.config["report"]:
-                    self.config["report"](
-                        {'ERROR'},
-                        "Unable to open the given FreeCAD file"
-                    )
-                    return {'CANCELLED'}
+                self.config["report"](
+                    {'ERROR'},
+                    "Unable to open the given FreeCAD file '{}'"
+                    "".format(self.config["filename"])
+                )
+                return {'CANCELLED'}
             else:
                 # print ("Transferring",len(doc.Objects),"objects to Blender")
                 self.prepare_collection()
                 self.import_doc_content(doc)
         except Exception as e:
-            error_messagae = str(e)
-            # print(error_messagae)
-            if self.config["report"]:
-                self.config["report"]({'ERROR'}, error_messagae)
+            self.config["report"]({'ERROR'}, str(e))
             raise e
         finally:
             # FreeCAD.closeDocument('Linking')

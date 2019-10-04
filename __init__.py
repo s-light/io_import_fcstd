@@ -109,7 +109,7 @@ class IMPORT_OT_FreeCAD(bpy.types.Operator):
         for file in self.files:
             filestr = str(file.name)
             if filestr.lower().endswith(".fcstd"):
-                importer = import_fcstd.ImportFcstd(
+                my_importer = import_fcstd.ImportFcstd(
                     update=self.option_update,
                     placement=self.option_placement,
                     tessellation=self.option_tessellation,
@@ -119,7 +119,7 @@ class IMPORT_OT_FreeCAD(bpy.types.Operator):
                     sharemats=self.option_sharemats,
                     report=self.report
                 )
-                return importer.import_fcstd(filename=dir+filestr)
+                return my_importer.import_fcstd(filename=dir+filestr)
         return {'FINISHED'}
 
 
