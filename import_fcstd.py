@@ -319,11 +319,94 @@ class ImportFcstd(object):
         # bpy.context.scene.objects.active = func_data["obj"]
         # obj.select = True
 
+    # shape
+    def handle_shape_edge(self, func_data, edge):
+        if self.hascurves(edge):
+            # TODO use tessellation value
+            dv = edge.discretize(9)
+            for i in range(len(dv)-1):
+                dv1 = [dv[i].x, dv[i].y, dv[i].z]
+                dv2 = [dv[i+1].x, dv[i+1].y, dv[i+1].z]
+                if dv1 not in func_data["verts"]:
+                    func_data["verts"].append(dv1)
+                if dv2 not in func_data["verts"]:
+                    func_data["verts"].append(dv2)
+                func_data["edges"].append([
+                    func_data["verts"].index(dv1),
+                    func_data["verts"].index(dv2)
+                ])
+        else:
+            e = []
+            for vert in edge.Vertexes:
+                # TODO discretize non-linear edges
+                v = [vert.X, vert.Y, vert.Z]
+                if v not in func_data["verts"]:
+                    func_data["verts"].append(v)
+                e.append(func_data["verts"].index(v))
+            func_data["edges"].append(e)
+
+    def handle_shape_face_as_polygon(self, func_data, face, faceedges):
+        import Part
+        if (
+            (len(face.Wires) > 1)
+            or (not isinstance(face.Surface, Part.Plane))
+            or self.hascurves(face)
+        ):
+            # face has holes or is curved, so we need to triangulate it
+            rawdata = face.tessellate(self.config["tessellation"])
+            for v in rawdata[0]:
+                vl = [v.x, v.y, v.z]
+                if vl not in func_data["verts"]:
+                    func_data["verts"].append(vl)
+            for f in rawdata[1]:
+                nf = []
+                for vi in f:
+                    nv = rawdata[0][vi]
+                    nf.append(func_data["verts"].index([nv.x, nv.y, nv.z]))
+                func_data["faces"].append(nf)
+            func_data["matindex"].append(len(rawdata[1]))
+        else:
+            f = []
+            ov = face.OuterWire.OrderedVertexes
+            for v in ov:
+                vl = [v.X, v.Y, v.Z]
+                if vl not in func_data["verts"]:
+                    func_data["verts"].append(vl)
+                f.append(func_data["verts"].index(vl))
+            # FreeCAD doesn't care about func_data["verts"] order.
+            # Make sure our loop goes clockwise
+            c = face.CenterOfMass
+            v1 = ov[0].Point.sub(c)
+            v2 = ov[1].Point.sub(c)
+            n = face.normalAt(0, 0)
+            if (v1.cross(v2)).getAngle(n) > 1.57:
+                # inverting func_data["verts"] order if the direction is couterclockwise
+                f.reverse()
+            func_data["faces"].append(f)
+            func_data["matindex"].append(1)
+        for e in face.Edges:
+            faceedges.append(e.hashCode())
+
+    def handle_shape_faces(self, func_data, shape, faceedges):
+        if TRIANGULATE:
+            # triangulate and make faces
+            rawdata = shape.tessellate(self.config["tessellation"])
+            for v in rawdata[0]:
+                func_data["verts"].append([v.x, v.y, v.z])
+            for f in rawdata[1]:
+                func_data["faces"].append(f)
+            for face in shape.Faces:
+                for e in face.Edges:
+                    faceedges.append(e.hashCode())
+        else:
+            # write FreeCAD faces as polygons when possible
+            for face in shape.Faces:
+                self.handle_shape_face_as_polygon(func_data, face, faceedges)
+
     def create_mesh_from_shape(self, func_data):
         """Create mesh from shape."""
         # a placeholder to store edges that belong to a face
         faceedges = []
-        import Part
         shape = func_data["obj"].Shape
         if self.config["placement"]:
             self.config["placement"] = func_data["obj"].Placement
@@ -331,85 +414,13 @@ class ImportFcstd(object):
             shape.Placement = self.config["placement"].\
                 inverse().multiply(shape.Placement)
         if shape.Faces:
-            if TRIANGULATE:
-                # triangulate and make faces
-                rawdata = shape.tessellate(self.config["tessellation"])
-                for v in rawdata[0]:
-                    func_data["verts"].append([v.x, v.y, v.z])
-                for f in rawdata[1]:
-                    func_data["faces"].append(f)
-                for face in shape.Faces:
-                    for e in face.Edges:
-                        faceedges.append(e.hashCode())
-            else:
-                # write FreeCAD faces as polygons when possible
-                for face in shape.Faces:
-                    if (
-                        (len(face.Wires) > 1)
-                        or (not isinstance(face.Surface, Part.Plane))
-                        or self.hascurves(face)
-                    ):
-                        # face has holes or is curved, so we need to triangulate it
-                        rawdata = face.tessellate(self.config["tessellation"])
-                        for v in rawdata[0]:
-                            vl = [v.x, v.y, v.z]
-                            if vl not in func_data["verts"]:
-                                func_data["verts"].append(vl)
-                        for f in rawdata[1]:
-                            nf = []
-                            for vi in f:
-                                nv = rawdata[0][vi]
-                                nf.append(func_data["verts"].index([nv.x, nv.y, nv.z]))
-                            func_data["faces"].append(nf)
-                        func_data["matindex"].append(len(rawdata[1]))
-                    else:
-                        f = []
-                        ov = face.OuterWire.OrderedVertexes
-                        for v in ov:
-                            vl = [v.X, v.Y, v.Z]
-                            if vl not in func_data["verts"]:
-                                func_data["verts"].append(vl)
-                            f.append(func_data["verts"].index(vl))
-                        # FreeCAD doesn't care about func_data["verts"] order.
-                        # Make sure our loop goes clockwise
-                        c = face.CenterOfMass
-                        v1 = ov[0].Point.sub(c)
-                        v2 = ov[1].Point.sub(c)
-                        n = face.normalAt(0, 0)
-                        if (v1.cross(v2)).getAngle(n) > 1.57:
-                            # inverting func_data["verts"] order if the direction is couterclockwise
-                            f.reverse()
-                        func_data["faces"].append(f)
-                        func_data["matindex"].append(1)
-                    for e in face.Edges:
-                        faceedges.append(e.hashCode())
+            self.handle_shape_faces(func_data, shape, faceedges)
+        # Treat remaining edges (that are not in faces)
         for edge in shape.Edges:
-            # Treat remaining edges (that are not in faces)
             if not (edge.hashCode() in faceedges):
-                if self.hascurves(edge):
-                    # TODO use tessellation value
-                    dv = edge.discretize(9)
-                    for i in range(len(dv)-1):
-                        dv1 = [dv[i].x, dv[i].y, dv[i].z]
-                        dv2 = [dv[i+1].x, dv[i+1].y, dv[i+1].z]
-                        if dv1 not in func_data["verts"]:
-                            func_data["verts"].append(dv1)
-                        if dv2 not in func_data["verts"]:
-                            func_data["verts"].append(dv2)
-                        func_data["edges"].append([
-                            func_data["verts"].index(dv1),
-                            func_data["verts"].index(dv2)
-                        ])
-                else:
-                    e = []
-                    for vert in edge.Vertexes:
-                        # TODO discretize non-linear edges
-                        v = [vert.X, vert.Y, vert.Z]
-                        if v not in func_data["verts"]:
-                            func_data["verts"].append(v)
-                        e.append(func_data["verts"].index(v))
-                    func_data["edges"].append(e)
+                self.handle_shape_edge(func_data, edge)
 
+    # mesh
     def create_mesh_from_mesh(self, func_data):
         # convert freecad mesh to blender mesh
         mesh = func_data["obj"].Mesh
@@ -421,6 +432,7 @@ class ImportFcstd(object):
         func_data["verts"] = [[v.x, v.y, v.z] for v in t[0]]
         func_data["faces"] = t[1]
 
+    # main object import
     def import_obj(self, obj):
         "Import Object."
         # import some FreeCAD modules needed below.
