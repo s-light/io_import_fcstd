@@ -119,39 +119,10 @@ class ImportFcstd(object):
     def print_report(self, mode, data):
         b_helper.print_multi(mode, data, self.report)
 
-    def hascurves(self, shape):
-        """Check if shape has curves."""
-        import Part
-        for e in shape.Edges:
-            if not isinstance(e.Curve, (Part.Line, Part.LineSegment)):
-                return True
-        return False
-
-    def handle_placement(self, bobj):
-        """Handle placement."""
-        if self.config["placement"]:
-            # print ("placement:",placement)
-            bobj.location = self.config["placement"].Base.multiply(
-                self.config["scale"])
-            m = bobj.rotation_mode
-            bobj.rotation_mode = 'QUATERNION'
-            if self.config["placement"].Rotation.Angle:
-                # FreeCAD Quaternion is XYZW while Blender is WXYZ
-                q = (
-                    (self.config["placement"].Rotation.Q[3], )
-                    + self.config["placement"].Rotation.Q[:3]
-                )
-                bobj.rotation_quaternion = (q)
-                bobj.rotation_mode = m
-            bobj.scale = (
-                self.config["scale"],
-                self.config["scale"],
-                self.config["scale"]
-            )
-
     def get_obj_label(self, obj):
         return self.config["obj_name_prefix"] + obj.Label
 
+    # material
     def get_obj_Transparency(self, obj_Name):
         alpha = 1.0
         if "Transparency" in self.guidata[obj_Name]:
@@ -265,6 +236,45 @@ class ImportFcstd(object):
             else:
                 self.handle_material_single(func_data, bobj)
 
+    # object handling
+    def rename_old_mesh(self, obj_label):
+        if obj_label in bpy.data.meshes:
+            name_old = bpy.data.meshes[obj_label].name + "_old"
+            if name_old in bpy.data.meshes:
+                # rename recusive..
+                self.rename_old_mesh(name_old)
+            bpy.data.meshes[obj_label].name = name_old
+
+    def hascurves(self, shape):
+        """Check if shape has curves."""
+        import Part
+        for e in shape.Edges:
+            if not isinstance(e.Curve, (Part.Line, Part.LineSegment)):
+                return True
+        return False
+
+    def handle_placement(self, bobj):
+        """Handle placement."""
+        if self.config["placement"]:
+            # print ("placement:",placement)
+            bobj.location = self.config["placement"].Base.multiply(
+                self.config["scale"])
+            m = bobj.rotation_mode
+            bobj.rotation_mode = 'QUATERNION'
+            if self.config["placement"].Rotation.Angle:
+                # FreeCAD Quaternion is XYZW while Blender is WXYZ
+                q = (
+                    (self.config["placement"].Rotation.Q[3], )
+                    + self.config["placement"].Rotation.Q[:3]
+                )
+                bobj.rotation_quaternion = (q)
+                bobj.rotation_mode = m
+            bobj.scale = (
+                self.config["scale"],
+                self.config["scale"],
+                self.config["scale"]
+            )
+
     def add_or_update_blender_obj(self, func_data):
         """Create or update object with mesh and material data."""
         bobj = None
@@ -279,6 +289,8 @@ class ImportFcstd(object):
                 if o.data.name == obj_label:
                     bobj = o
                     print("Replacing existing object:", obj_label)
+
+        self.rename_old_mesh(obj_label)
         bmesh = bpy.data.meshes.new(name=obj_label)
         bmesh.from_pydata(
             func_data["verts"],
@@ -295,7 +307,6 @@ class ImportFcstd(object):
             self.handle_placement(bobj)
             self.handle_material(func_data, bobj)
 
-        # TODO: on update: check if already there
         if self.config['update']:
             if bobj.name not in self.fcstd_collection.objects:
                 self.fcstd_collection.objects.link(bobj)
