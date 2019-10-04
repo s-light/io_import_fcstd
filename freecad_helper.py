@@ -71,11 +71,11 @@ def get_root_objects(doc):
 
 
 # ******************************************
-# `isTopLevelInList` and `getTopLevelObjects`
+# `is_toplevel_in_list` and `get_toplevel_objects`
 # from forum post 'Get highest objects of model' by kbwbe
 # https://forum.freecadweb.org/viewtopic.php?p=338214&sid=a6dd59fe66c1d807f8537f192fdb14dc#p338214
 
-def isTopLevelInList(lst):
+def is_toplevel_in_list(lst):
     if len(lst) == 0:
         return True
     for ob in lst:
@@ -88,10 +88,10 @@ def isTopLevelInList(lst):
     return True
 
 
-def getTopLevelObjects(doc):
+def get_toplevel_objects(doc):
     topLevelShapes = []
     for ob in doc.Objects:
-        if isTopLevelInList(ob.InList):
+        if is_toplevel_in_list(ob.InList):
             topLevelShapes.append(ob)
         else:
             numBodies = 0
