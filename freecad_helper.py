@@ -4,15 +4,17 @@
 
 def print_obj_header():
     print(
-        "     {:<15} {:<25} {:<25} "
+        "     {:<15} {:<25} {:<25}"
         "".format("Name", "Label", "TypeId"),
         end=''
     )
-    print("[Parents]", end='')
+    print("p[Parents]", end='')
     print("    ", end='')
-    print("[InList]", end='')
+    print("i[InList]", end='')
     print("    ", end='')
-    print("[OutList]", end='')
+    print("o[OutList]", end='')
+    print("    ", end='')
+    print("g[Group]", end='')
     print("    ", end='')
     print()
 
@@ -23,12 +25,15 @@ def print_obj(obj):
         "".format(obj.Name, obj.Label, obj.TypeId),
         end=''
     )
-    print(obj.Parents, end='')
+    print("p", obj.Parents, end='')
     print("    ", end='')
-    print(obj.InList, end='')
+    print("i", obj.InList, end='')
     print("    ", end='')
-    print(obj.OutList, end='')
+    print("o", obj.OutList, end='')
     print("    ", end='')
+    if hasattr(obj, 'Group'):
+        print("g", obj.Group, end='')
+        print("    ", end='')
     print()
 
 
@@ -40,7 +45,8 @@ def print_objects(objects):
 
 # ****************************************
 
-def get_filtered_objects(doc, typeid_filter_list=None):
+
+def filtered_objects(objects, typeid_filter_list=None, include_only_visible=False):
     if typeid_filter_list is None:
         typeid_filter_list = [
             'App::Line',
@@ -51,9 +57,24 @@ def get_filtered_objects(doc, typeid_filter_list=None):
             # 'Sketcher::SketchObject',
         ]
     result_objects = []
-    for obj in doc.Objects:
-        if obj.TypeId not in typeid_filter_list:
-            result_objects.append(obj)
+    for obj in objects:
+        if (obj.TypeId not in typeid_filter_list):
+            if include_only_visible:
+                if hasattr(obj, 'Visibility'):
+                    if obj.Visibility:
+                        result_objects.append(obj)
+                else:
+                    print("obj has no Visibility attribute.")
+            else:
+                result_objects.append(obj)
+    return result_objects
+
+
+def get_filtered_objects(doc, typeid_filter_list=None):
+    result_objects = filtered_objects(
+        doc.Objects,
+        typeid_filter_list
+    )
     return result_objects
 
 

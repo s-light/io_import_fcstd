@@ -432,6 +432,26 @@ class ImportFcstd(object):
         func_data["verts"] = [[v.x, v.y, v.z] for v in t[0]]
         func_data["faces"] = t[1]
 
+    # part
+    def handle_part(self, func_data):
+        """Handle part."""
+        print("handle_part:")
+        part_label = self.get_obj_label(func_data["obj"])
+        print("part_label", part_label)
+
+        # TODO: create a collection for this part
+
+        print("check sub elements")
+        print("Group: ", func_data["obj"].Group)
+        fc_helper.print_objects(func_data["obj"].Group)
+        sub_objects = fc_helper.filtered_objects(
+            func_data["obj"].Group,
+            include_only_visible=True
+        )
+        fc_helper.print_objects(sub_objects)
+        # for obj in sub_objects:
+        #     print(obj)
+
     # main object import
     def import_obj(self, obj):
         "Import Object."
@@ -458,8 +478,15 @@ class ImportFcstd(object):
             self.create_mesh_from_shape(func_data)
         elif obj.isDerivedFrom("Mesh::Feature"):
             self.create_mesh_from_mesh(func_data)
-        # elif obj.isDerivedFrom("PartDesign::Feature"):
-        #     self.create_mesh_from_PartDesign(func_data)
+        # elif obj.isDerivedFrom("PartDesign::Body"):
+        #     self.create_mesh_from_Body(func_data)
+        elif obj.isDerivedFrom("App::Part"):
+            self.config["report"]({'WARNING'}, (
+                "'{}' ('{}') of type '{}': "
+                "Warning: Part handling is highly experimental!!"
+                "".format(obj.Label, obj.Name, obj.TypeId)
+            ))
+            self.handle_part(func_data)
         else:
             self.config["report"]({'WARNING'}, (
                 "Unable to load '{}' ('{}') of type '{}'. (Type Not implemented yet)."
@@ -469,7 +496,7 @@ class ImportFcstd(object):
         if func_data["verts"] and (func_data["faces"] or func_data["edges"]):
             self.add_or_update_blender_obj(func_data)
 
-    def check_visibility(self, obj):
+    def check_visibility_skip(self, obj):
         """Check if obj is visible."""
         result = True
         if (
@@ -493,7 +520,7 @@ class ImportFcstd(object):
             "".format(len(obj_list))
         ))
         for obj in obj_list:
-            if self.check_visibility(obj):
+            if self.check_visibility_skip(obj):
                 print(
                     "→ {:<15} {:<25}"
                     "".format(obj.Name, obj.Label)
