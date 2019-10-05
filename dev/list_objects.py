@@ -95,6 +95,20 @@ importlib.reload(freecad_helper)
 #
 # ******************************************
 
+doc = None
+t1 = None
+t2 = None
+
+
+def start_test():
+    global doc
+    doc = FreeCAD.open("./freecad_linking_example/assembly.FCStd")
+    global t1
+    t1 = doc.getObjectsByLabel("my_final_assembly")[0]
+    global t2
+    t2 = doc.getObjectsByLabel("octagon_part")[0]
+
+
 def run_tests(doc):
     print("~"*42)
     print("get_filtered_objects")
