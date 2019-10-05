@@ -26,7 +26,7 @@ except ModuleNotFoundError as e:
 # prepare directory helpers
 # print(sys.argv[0])
 print(os.path.realpath(__file__))
-script_dir = ".."
+script_dir = "."
 if bpy:
     temp_path = os.path.join(__file__, "..")
     temp_path = os.path.join(temp_path, "..")
@@ -44,9 +44,7 @@ print("base_dir", base_dir)
 if base_dir not in sys.path:
     sys.path.append(base_dir)
 
-outside_package_dir = ".."
-if bpy:
-    outside_package_dir = os.path.join(base_dir, "..")
+outside_package_dir = os.path.join(base_dir, "..")
 outside_package_dir = os.path.realpath(outside_package_dir)
 print("outside_package_dir", outside_package_dir)
 if outside_package_dir not in sys.path:

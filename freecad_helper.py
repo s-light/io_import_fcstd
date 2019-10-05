@@ -2,58 +2,108 @@
 # -*- coding: utf-8 -*-
 
 
-def print_obj_header(pre_line=""):
+def print_obj_header(
+    pre_line="",
+    show_lists=False,
+    show_list_details=False,
+):
     print(
         pre_line +
-        "     {:<15} {:<25} {:<25}"
+        "{:<15} {:<25} {:<25}"
         "".format("Name", "Label", "TypeId"),
         end=''
     )
-    print("p [Parents]", end='')
-    print("    ", end='')
-    print("i [InList]", end='')
-    print("    ", end='')
-    print("o [OutList]", end='')
-    print("    ", end='')
-    print("g [Group]", end='')
-    print("    ", end='')
+    if show_lists:
+        print(
+            "{:>2} {:>2} {:>2} {:>2}"
+            "".format(
+                "P",
+                "I",
+                "O",
+                "G",
+            ),
+            end=''
+        )
+        if show_list_details:
+            print(
+                (
+                    "    {:<10}" * 4
+                ).format(
+                    '[Parents]',
+                    '[InList]',
+                    '[OutList]',
+                    '[Group]'
+                ),
+                end=''
+            )
     print()
 
 
-def print_obj(obj, show_details=False, pre_line=""):
+def print_obj(
+    obj,
+    pre_line="",
+    show_lists=False,
+    show_list_details=False,
+    end="\n",
+):
     print(
         pre_line +
-        "obj: {:<15} {:<25} {:<25}"
+        "{:<15} {:<25} {:<25}"
         "".format(obj.Name, obj.Label, obj.TypeId),
         end=''
     )
-    if show_details:
-        print("p", obj.Parents, end='')
-        print("    ", end='')
-        print("i", obj.InList, end='')
-        print("    ", end='')
-        print("o", obj.OutList, end='')
-        print("    ", end='')
+    if show_lists:
+        group_count = '_'
         if hasattr(obj, 'Group'):
-            print("g", obj.Group, end='')
-            print("    ", end='')
-    else:
-        print("p", len(obj.Parents), end='')
-        print("    ", end='')
-        print("i", len(obj.InList), end='')
-        print("    ", end='')
-        print("o", len(obj.OutList), end='')
-        print("    ", end='')
-        if hasattr(obj, 'Group'):
-            print("g", len(obj.Group), end='')
-            print("    ", end='')
-    print()
+            group_count = len(obj.Group)
+        print(
+            "{:>2} {:>2} {:>2} {:>2}"
+            "".format(
+                len(obj.Parents),
+                len(obj.InList),
+                len(obj.OutList),
+                group_count
+            ),
+            end=''
+        )
+        if show_list_details:
+            group = None
+            if hasattr(obj, 'Group'):
+                group = obj.Group
+            print(
+                (
+                    "    {:<10}" * 4
+                ).format(
+                    str(obj.Parents),
+                    str(obj.InList),
+                    str(obj.OutList),
+                    str(group)
+                ),
+                end=''
+            )
+    print("", end=end)
 
 
-def print_objects(objects, pre_line=""):
-    print_obj_header(pre_line=pre_line)
+def print_objects(
+    objects,
+    pre_line="",
+    pre_list_entry="* ",
+    show_lists=False,
+    show_list_details=False,
+):
+    pre_list_entry_space = " "*len(pre_list_entry)
+    print_obj_header(
+        pre_line=pre_line + pre_list_entry_space,
+        show_lists=show_lists,
+        show_list_details=show_list_details,
+    )
     for obj in objects:
-        print_obj(obj, pre_line=pre_line)
+        print_obj(
+            obj,
+            pre_line=pre_line + pre_list_entry,
+            show_lists=show_lists,
+            show_list_details=show_list_details,
+        )
 
 
 # ****************************************

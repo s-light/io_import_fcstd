@@ -571,18 +571,22 @@ class ImportFcstd(object):
             doc,
             filter_list=self.typeid_filter_list
         )
-        fc_helper.print_objects(obj_list)
         print("-"*21)
+
         self.config["report"]({'INFO'}, (
-            "import {} objects.."
-            "".format(len(obj_list))
+            "found {} objects in '{}'"
+            "".format(len(obj_list), self.doc_filename)
         ))
+        fc_helper.print_objects(
+            obj_list,
+            show_lists=True,
+            show_list_details=True
+        )
+        print("-"*21)
+        self.config["report"]({'INFO'}, "Import:")
         for obj in obj_list:
             if self.check_visibility_skip(obj):
-                print(
-                    "→ {:<15} {:<25}"
-                    "".format(obj.Name, obj.Label)
-                )
+                fc_helper.print_obj(obj)
                 self.import_obj(obj=obj, collection=self.fcstd_collection)
 
     def prepare_collection(self):
