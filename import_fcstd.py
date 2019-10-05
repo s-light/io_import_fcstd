@@ -121,12 +121,17 @@ class ImportFcstd(object):
     def print_report(self, mode, data):
         b_helper.print_multi(mode, data, self.report)
 
-    def print_obj(self, obj, pre_line="", end="\n"):
-        print(
+    def print_obj(self, obj, pre_line="", post_line="", end="\n"):
+        message = (
             pre_line +
             "'{}' ('{}' <{}>)"
-            "".format(obj.Label, obj.Name, obj.TypeId),
-            end=end
+            "".format(obj.Label, obj.Name, obj.TypeId)
+            + post_line
+        )
+        # print(message, end=end)
+        self.config["report"](
+            {'INFO'},
+            message
         )
 
     def get_obj_label(self, obj):
@@ -509,7 +514,11 @@ class ImportFcstd(object):
                     pre_line=pre_line + '    '
                 )
         else:
-            print(pre_line + "→ no group childs.")
+            print(
+                b_helper.colors.fg.darkgrey
+                + pre_line + "→ no group childs."
+                + b_helper.colors.reset
+            )
         # reset current collection
         func_data["collection"] = func_data["collection_parent"]
         func_data["collection_parent"] = None
@@ -609,9 +618,9 @@ class ImportFcstd(object):
                     pre_line="    ",
                 )
             else:
-                print(b_helper.colors.fg.darkgrey, end="")
-                self.print_obj(obj, pre_line="- ", end="")
-                print(" (hidden)" + b_helper.colors.reset)
+                pre = b_helper.colors.fg.darkgrey + "- "
+                post = " (hidden)" + b_helper.colors.reset
+                self.print_obj(obj, pre_line=pre, post_line=post)
 
     def prepare_collection(self):
         if self.config["update"]:
