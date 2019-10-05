@@ -310,12 +310,12 @@ class ImportFcstd(object):
             self.handle_material_new(func_data, bobj)
 
         if self.config['update']:
-            if bobj.name not in self.fcstd_collection.objects:
-                self.fcstd_collection.objects.link(bobj)
+            if bobj.name not in func_data["collection"].objects:
+                func_data["collection"].objects.link(bobj)
             else:
-                print(bobj.name, "already in collection", self.fcstd_collection)
+                print(bobj.name, "already in collection", func_data["collection"])
         else:
-            self.fcstd_collection.objects.link(bobj)
+            func_data["collection"].objects.link(bobj)
         # bpy.context.scene.objects.active = func_data["obj"]
         # obj.select = True
 
@@ -433,27 +433,64 @@ class ImportFcstd(object):
         func_data["faces"] = t[1]
 
     # part
+    def part_collection_add_or_update(self, func_data, collection_label):
+        temp_collection = None
+        # if self.config["update"]:
+        #     if collection_label in bpy.data.collections:
+        #         temp_collection = bpy.data.collections[collection_label]
+        # else:
+        #     self.rename_old_data(bpy.data.collections, collection_label)
+        # if temp_collection:
+        #     bpy.context.scene.collection.children.link(self.fcstd_collection)
+        # else:
+        #     func_data["current_collection"] = bpy.data.collections.new(collection_label)
+        if collection_label in bpy.data.collections:
+            temp_collection = bpy.data.collections[collection_label]
+        else:
+            temp_collection = bpy.data.collections.new(collection_label)
+            func_data["collection"].children.link(temp_collection)
+        func_data["collection_parent"] = func_data["collection"]
+        func_data["collection"] = temp_collection
+
     def handle_part(self, func_data):
         """Handle part."""
         print("handle_part:")
         part_label = self.get_obj_label(func_data["obj"])
         print("part_label", part_label)
-
-        # TODO: create a collection for this part
-
-        print("check sub elements")
-        print("Group: ", func_data["obj"].Group)
-        fc_helper.print_objects(func_data["obj"].Group)
-        sub_objects = fc_helper.filtered_objects(
-            func_data["obj"].Group,
-            include_only_visible=True
-        )
-        fc_helper.print_objects(sub_objects)
-        # for obj in sub_objects:
-        #     print(obj)
+        self.part_collection_add_or_update(func_data, part_label)
+        # print("check sub elements")
+        group = func_data["obj"].Group
+        if len(group) > 0:
+            # print("Group: ", group)
+            # print("***")
+            # fc_helper.print_objects(group)
+            sub_objects = fc_helper.filtered_objects(
+                group,
+                include_only_visible=True
+            )
+            pre_line = "|   "
+            print("|" + ("*"*42))
+            print(pre_line)
+            print(pre_line + "Filterd SUB objects")
+            fc_helper.print_objects(sub_objects, pre_line=pre_line)
+            # print("    " "Import Recusive:")
+            # for obj in sub_objects:
+            #     self.import_obj(
+            #         obj=obj,
+            #         collection=func_data["collection"],
+            #         collection_parent=func_data["collection_parent"],
+            #         pre_line=pre_line
+            #     )
+            print(pre_line)
+            print("|" + ("*"*42))
+        else:
+            print("→ no group childs.")
+        # reset current collection
+        func_data["collection"] = func_data["collection_parent"]
+        func_data["collection_parent"] = None
 
     # main object import
-    def import_obj(self, obj):
+    def import_obj(self, obj=None, collection=None, collection_parent=None):
         "Import Object."
         # import some FreeCAD modules needed below.
         # After "import FreeCAD" these modules become available
@@ -471,30 +508,37 @@ class ImportFcstd(object):
             # to store reusable materials
             "matdatabase": {},
             # name: "Unnamed",
+            "collection": collection,
+            "collection_parent": collection_parent,
         }
         # func_data["matindex"]
 
-        if obj.isDerivedFrom("Part::Feature"):
-            self.create_mesh_from_shape(func_data)
-        elif obj.isDerivedFrom("Mesh::Feature"):
-            self.create_mesh_from_mesh(func_data)
-        # elif obj.isDerivedFrom("PartDesign::Body"):
-        #     self.create_mesh_from_Body(func_data)
-        elif obj.isDerivedFrom("App::Part"):
-            self.config["report"]({'WARNING'}, (
-                "'{}' ('{}') of type '{}': "
-                "Warning: Part handling is highly experimental!!"
-                "".format(obj.Label, obj.Name, obj.TypeId)
-            ))
-            self.handle_part(func_data)
-        else:
-            self.config["report"]({'WARNING'}, (
-                "Unable to load '{}' ('{}') of type '{}'. (Type Not implemented yet)."
-                "".format(obj.Label, obj.Name, obj.TypeId)
-            ))
+        if obj:
+            if obj.isDerivedFrom("Part::Feature"):
+                self.create_mesh_from_shape(func_data)
+            elif obj.isDerivedFrom("Mesh::Feature"):
+                self.create_mesh_from_mesh(func_data)
+            # elif obj.isDerivedFrom("PartDesign::Body"):
+            #     self.create_mesh_from_Body(func_data)
+            elif obj.isDerivedFrom("App::Part"):
+                self.config["report"]({'WARNING'}, (
+                    "'{}' ('{}') of type '{}': "
+                    "Warning: Part handling is highly experimental!!"
+                    "".format(obj.Label, obj.Name, obj.TypeId)
+                ))
+                self.handle_part(func_data)
+            else:
+                self.config["report"]({'WARNING'}, (
+                    "Unable to load '{}' ('{}') of type '{}'. "
+                    "(Type Not implemented yet)."
+                    "".format(obj.Label, obj.Name, obj.TypeId)
+                ))
 
-        if func_data["verts"] and (func_data["faces"] or func_data["edges"]):
-            self.add_or_update_blender_obj(func_data)
+            if (
+                func_data["verts"]
+                and (func_data["faces"] or func_data["edges"])
+            ):
+                self.add_or_update_blender_obj(func_data)
 
     def check_visibility_skip(self, obj):
         """Check if obj is visible."""
@@ -525,10 +569,9 @@ class ImportFcstd(object):
                     "→ {:<15} {:<25}"
                     "".format(obj.Name, obj.Label)
                 )
-                self.import_obj(obj)
+                self.import_obj(obj=obj, collection=self.fcstd_collection)
 
     def prepare_collection(self):
-        # TODO: on update: check if already there
         if self.config["update"]:
             if self.doc_filename in bpy.data.collections:
                 self.fcstd_collection = bpy.data.collections[self.doc_filename]

@@ -2,8 +2,9 @@
 # -*- coding: utf-8 -*-
 
 
-def print_obj_header():
+def print_obj_header(pre_line=""):
     print(
+        pre_line +
         "     {:<15} {:<25} {:<25}"
         "".format("Name", "Label", "TypeId"),
         end=''
@@ -19,8 +20,9 @@ def print_obj_header():
     print()
 
 
-def print_obj(obj, show_details=False):
+def print_obj(obj, show_details=False, pre_line=""):
     print(
+        pre_line +
         "obj: {:<15} {:<25} {:<25}"
         "".format(obj.Name, obj.Label, obj.TypeId),
         end=''
@@ -48,10 +50,10 @@ def print_obj(obj, show_details=False):
     print()
 
 
-def print_objects(objects):
-    print_obj_header()
+def print_objects(objects, pre_line=""):
+    print_obj_header(pre_line=pre_line)
     for obj in objects:
-        print_obj(obj)
+        print_obj(obj, pre_line=pre_line)
 
 
 # ****************************************
