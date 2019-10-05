@@ -8,32 +8,43 @@ def print_obj_header():
         "".format("Name", "Label", "TypeId"),
         end=''
     )
-    print("p[Parents]", end='')
+    print("p [Parents]", end='')
     print("    ", end='')
-    print("i[InList]", end='')
+    print("i [InList]", end='')
     print("    ", end='')
-    print("o[OutList]", end='')
+    print("o [OutList]", end='')
     print("    ", end='')
-    print("g[Group]", end='')
+    print("g [Group]", end='')
     print("    ", end='')
     print()
 
 
-def print_obj(obj):
+def print_obj(obj, show_details=False):
     print(
         "obj: {:<15} {:<25} {:<25}"
         "".format(obj.Name, obj.Label, obj.TypeId),
         end=''
     )
-    print("p", obj.Parents, end='')
-    print("    ", end='')
-    print("i", obj.InList, end='')
-    print("    ", end='')
-    print("o", obj.OutList, end='')
-    print("    ", end='')
-    if hasattr(obj, 'Group'):
-        print("g", obj.Group, end='')
+    if show_details:
+        print("p", obj.Parents, end='')
         print("    ", end='')
+        print("i", obj.InList, end='')
+        print("    ", end='')
+        print("o", obj.OutList, end='')
+        print("    ", end='')
+        if hasattr(obj, 'Group'):
+            print("g", obj.Group, end='')
+            print("    ", end='')
+    else:
+        print("p", len(obj.Parents), end='')
+        print("    ", end='')
+        print("i", len(obj.InList), end='')
+        print("    ", end='')
+        print("o", len(obj.OutList), end='')
+        print("    ", end='')
+        if hasattr(obj, 'Group'):
+            print("g", len(obj.Group), end='')
+            print("    ", end='')
     print()
 
 

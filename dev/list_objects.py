@@ -111,24 +111,27 @@ def start_test():
 
 def run_tests(doc):
     print("~"*42)
-    print("get_filtered_objects")
-    freecad_helper.print_objects(freecad_helper.get_filtered_objects(doc))
+    objects = freecad_helper.get_filtered_objects(doc)
+    print("get_filtered_objects", len(objects))
+    freecad_helper.print_objects(objects)
 
     print("~"*42)
-    print("get_root_objects")
     objects = freecad_helper.get_root_objects(
         doc,
         filter_list=['Sketcher::SketchObject', ]
     )
+    print("get_root_objects", len(objects))
     freecad_helper.print_objects(objects)
 
     print("~"*42)
-    print("doc.RootObjects")
-    freecad_helper.print_objects(doc.RootObjects)
+    objects = doc.RootObjects
+    print("doc.RootObjects", len(objects))
+    freecad_helper.print_objects(objects)
 
     print("~"*42)
-    print("get_toplevel_objects")
-    freecad_helper.print_objects(freecad_helper.get_toplevel_objects(doc))
+    objects = freecad_helper.get_toplevel_objects(doc)
+    print("get_toplevel_objects", len(objects))
+    freecad_helper.print_objects(objects)
 
     print("~"*42)
     print("tests done :-)")
