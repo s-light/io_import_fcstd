@@ -121,6 +121,14 @@ class ImportFcstd(object):
     def print_report(self, mode, data):
         b_helper.print_multi(mode, data, self.report)
 
+    def print_obj(self, obj, pre_line="", end="\n"):
+        print(
+            pre_line +
+            "'{}' ('{}' <{}>)"
+            "".format(obj.Label, obj.Name, obj.TypeId),
+            end=end
+        )
+
     def get_obj_label(self, obj):
         return self.config["obj_name_prefix"] + obj.Label
 
@@ -465,35 +473,43 @@ class ImportFcstd(object):
         """Handle part."""
         pre_line = func_data["pre_line"]
         part_label = self.get_obj_label(func_data["obj"])
-        print(pre_line + "handle_part: '{}'".format(part_label))
+        # print(pre_line + "handle_part: '{}'".format(part_label))
         self.part_collection_add_or_update(func_data, part_label)
         # print(pre_line + "check sub elements")
         group = func_data["obj"].Group
         if len(group) > 0:
             # print(pre_line + "Group: ", group)
-            # print(pre_line + "***")
+            # pre_sub = pre_line + "|   "
+            # print(pre_line + "|" + ("*"*42))
+            # print(pre_sub)
+            # print(pre_sub + "SUB objects")
             # fc_helper.print_objects(group)
+            # print(pre_sub)
             sub_objects = fc_helper.filtered_objects(
                 group,
                 include_only_visible=True
             )
-            pre_sub = pre_line + "|   "
-            print(pre_line + "|" + ("*"*42))
-            print(pre_sub)
-            print(pre_sub + "Filterd SUB objects")
-            fc_helper.print_objects(sub_objects, pre_line=pre_sub)
-            print(pre_sub + "Import Recusive:")
+            # print(pre_line + "|" + ("*"*42))
+            # print(pre_sub + "Filterd SUB objects")
+            # fc_helper.print_objects(sub_objects, pre_line=pre_sub)
+            # print(pre_sub)
+            # print(pre_line + "|" + ("*"*42))
+            print(
+                b_helper.colors.bold
+                + b_helper.colors.fg.purple
+                + pre_line + "Import Recusive:"
+                + b_helper.colors.reset
+            )
             for obj in sub_objects:
+                self.print_obj(obj, pre_line + "- ")
                 self.import_obj(
                     obj=obj,
                     collection=func_data["collection"],
                     collection_parent=func_data["collection_parent"],
-                    pre_line=pre_sub
+                    pre_line=pre_line + '    '
                 )
-            print(pre_sub)
-            print(pre_line + "|" + ("*"*42))
         else:
-            print("→ no group childs.")
+            print(pre_line + "→ no group childs.")
         # reset current collection
         func_data["collection"] = func_data["collection_parent"]
         func_data["collection_parent"] = None
@@ -586,8 +602,16 @@ class ImportFcstd(object):
         self.config["report"]({'INFO'}, "Import:")
         for obj in obj_list:
             if self.check_visibility_skip(obj):
-                fc_helper.print_obj(obj)
-                self.import_obj(obj=obj, collection=self.fcstd_collection)
+                self.print_obj(obj, pre_line="- ")
+                self.import_obj(
+                    obj=obj,
+                    collection=self.fcstd_collection,
+                    pre_line="    ",
+                )
+            else:
+                print(b_helper.colors.fg.darkgrey, end="")
+                self.print_obj(obj, pre_line="- ", end="")
+                print(" (hidden)" + b_helper.colors.reset)
 
     def prepare_collection(self):
         if self.config["update"]:

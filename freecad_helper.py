@@ -10,7 +10,7 @@ def print_obj_header(
     print(
         pre_line +
         "{:<15} {:<25} {:<25}"
-        "".format("Name", "Label", "TypeId"),
+        "".format("Label", "Name", "TypeId"),
         end=''
     )
     if show_lists:
@@ -48,8 +48,8 @@ def print_obj(
 ):
     print(
         pre_line +
-        "{:<15} {:<25} {:<25}"
-        "".format(obj.Name, obj.Label, obj.TypeId),
+        "{:<25} {:<15} {:<25}"
+        "".format(obj.Label, obj.Name, obj.TypeId),
         end=''
     )
     if show_lists:

@@ -69,7 +69,7 @@ def print_colored(mode, data):
         printcolor = colors.fg.orange
     elif mode == {'ERROR'}:
         printcolor = colors.fg.red
-    print(printcolor, data, colors.reset)
+    print("{}{}{}".format(printcolor, data, colors.reset))
 
 
 # https://blender.stackexchange.com/a/142317/16634
@@ -98,7 +98,6 @@ def print_multi(mode, data, report=None):
         report(mode, data)
     else:
         print_blender_console(mode, data)
-
 
 
 # def print_info(mode, data):
