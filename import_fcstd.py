@@ -279,13 +279,18 @@ class ImportFcstd(object):
 
     def add_or_update_blender_obj(self, func_data):
         """Create or update object with mesh and material data."""
+        pre_line = func_data["pre_line"]
         bobj = None
         obj_label = self.get_obj_label(func_data["obj"])
         if self.config["update"]:
             # locate existing object (object with same name)
             if obj_label in bpy.data.objects:
                 bobj = bpy.data.objects[obj_label]
-                print("Replacing existing object mesh:", obj_label)
+                print(
+                    pre_line +
+                    "Replacing existing object mesh: {}"
+                    "".format(obj_label)
+                )
                 # rename old mesh - this way the new mesh can get the orig. name.
                 self.rename_old_data(bpy.data.meshes, obj_label)
 
@@ -313,7 +318,11 @@ class ImportFcstd(object):
             if bobj.name not in func_data["collection"].objects:
                 func_data["collection"].objects.link(bobj)
             else:
-                print(bobj.name, "already in collection", func_data["collection"])
+                print(
+                    pre_line +
+                    "'{}' already in collection '{}'"
+                    "".format(bobj.name, func_data["collection"])
+                )
         else:
             func_data["collection"].objects.link(bobj)
         # bpy.context.scene.objects.active = func_data["obj"]
@@ -454,35 +463,35 @@ class ImportFcstd(object):
 
     def handle_part(self, func_data):
         """Handle part."""
-        print("handle_part:")
+        pre_line = func_data["pre_line"]
         part_label = self.get_obj_label(func_data["obj"])
-        print("part_label", part_label)
+        print(pre_line + "handle_part: '{}'".format(part_label))
         self.part_collection_add_or_update(func_data, part_label)
-        # print("check sub elements")
+        # print(pre_line + "check sub elements")
         group = func_data["obj"].Group
         if len(group) > 0:
-            # print("Group: ", group)
-            # print("***")
+            # print(pre_line + "Group: ", group)
+            # print(pre_line + "***")
             # fc_helper.print_objects(group)
             sub_objects = fc_helper.filtered_objects(
                 group,
                 include_only_visible=True
             )
-            pre_line = "|   "
-            print("|" + ("*"*42))
-            print(pre_line)
-            print(pre_line + "Filterd SUB objects")
-            fc_helper.print_objects(sub_objects, pre_line=pre_line)
-            # print("    " "Import Recusive:")
-            # for obj in sub_objects:
-            #     self.import_obj(
-            #         obj=obj,
-            #         collection=func_data["collection"],
-            #         collection_parent=func_data["collection_parent"],
-            #         pre_line=pre_line
-            #     )
-            print(pre_line)
-            print("|" + ("*"*42))
+            pre_sub = pre_line + "|   "
+            print(pre_line + "|" + ("*"*42))
+            print(pre_sub)
+            print(pre_sub + "Filterd SUB objects")
+            fc_helper.print_objects(sub_objects, pre_line=pre_sub)
+            print(pre_sub + "Import Recusive:")
+            for obj in sub_objects:
+                self.import_obj(
+                    obj=obj,
+                    collection=func_data["collection"],
+                    collection_parent=func_data["collection_parent"],
+                    pre_line=pre_sub
+                )
+            print(pre_sub)
+            print(pre_line + "|" + ("*"*42))
         else:
             print("→ no group childs.")
         # reset current collection
@@ -490,7 +499,7 @@ class ImportFcstd(object):
         func_data["collection_parent"] = None
 
     # main object import
-    def import_obj(self, obj=None, collection=None, collection_parent=None):
+    def import_obj(self, obj=None, collection=None, collection_parent=None, pre_line=""):
         "Import Object."
         # import some FreeCAD modules needed below.
         # After "import FreeCAD" these modules become available
@@ -510,6 +519,7 @@ class ImportFcstd(object):
             # name: "Unnamed",
             "collection": collection,
             "collection_parent": collection_parent,
+            "pre_line": pre_line,
         }
         # func_data["matindex"]
 
@@ -521,14 +531,18 @@ class ImportFcstd(object):
             # elif obj.isDerivedFrom("PartDesign::Body"):
             #     self.create_mesh_from_Body(func_data)
             elif obj.isDerivedFrom("App::Part"):
-                self.config["report"]({'WARNING'}, (
-                    "'{}' ('{}') of type '{}': "
-                    "Warning: Part handling is highly experimental!!"
-                    "".format(obj.Label, obj.Name, obj.TypeId)
-                ))
                 self.handle_part(func_data)
+            # elif obj.isDerivedFrom("App::Link"):
+            #     self.config["report"]({'WARNING'}, (
+            #         pre_line +
+            #         "'{}' ('{}') of type '{}': "
+            #         "Warning: Link handling is highly experimental!!"
+            #         "".format(obj.Label, obj.Name, obj.TypeId)
+            #     ))
+            #     self.handle_link(func_data)
             else:
                 self.config["report"]({'WARNING'}, (
+                    pre_line +
                     "Unable to load '{}' ('{}') of type '{}'. "
                     "(Type Not implemented yet)."
                     "".format(obj.Label, obj.Name, obj.TypeId)
