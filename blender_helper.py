@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+"""Random Helper Functions & Classe for Blender Python Scripting."""
+
+import re
+
 try:
     import bpy
 except ModuleNotFoundError as e:
@@ -13,17 +17,21 @@ except ModuleNotFoundError as e:
 # Python program to print
 # colored text and background
 class colors:
-    '''
-        Colors class:
-        reset all colors with colors.reset;
-        two sub classes
-            fg for foreground
-            bg for background;
-        use as colors.subclass.colorname.
-        i.e. colors.fg.red or colors.bg.greenalso,
-        the generic bold, disable, underline, reverse, strike through,
-        and invisible work with the main class i.e. colors.bold
-    '''
+    """
+    ASCII Color and Control Characters.
+
+    reset all colors with colors.reset;
+    two sub classes
+        fg for foreground
+        bg for background;
+    use as colors.subclass.colorname:
+    `colors.fg.red`
+    `colors.bg.green`
+    the generics
+    bold, disable, underline, reverse, strike through, invisible
+    work with the main class:
+    `colors.bold`
+    """
 
     reset = '\033[0m'
     bold = '\033[01m'
@@ -34,6 +42,8 @@ class colors:
     invisible = '\033[08m'
 
     class fg:
+        """Forderground Colors."""
+
         black = '\033[30m'
         red = '\033[31m'
         green = '\033[32m'
@@ -51,6 +61,8 @@ class colors:
         lightcyan = '\033[96m'
 
     class bg:
+        """Background Colors."""
+
         black = '\033[40m'
         red = '\033[41m'
         green = '\033[42m'
@@ -60,8 +72,71 @@ class colors:
         cyan = '\033[46m'
         lightgrey = '\033[47m'
 
+    @classmethod
+    def get_flat_list(cls, obj_dict=None):
+        """Get a flattend list of all control characters in dict."""
+        result = []
+        if obj_dict is None:
+            obj_dict = cls.__dict__
+        # print("*"*42)
+        # print("obj_dict", obj_dict)
+        # print("*"*42)
+        for attr_name, attr_value in obj_dict.items():
+            if not attr_name.startswith("__"):
+                # if type(attr_value) is str:
+                #     value_str = attr_value.replace("\x1b", "\\x1b")
+                # else:
+                #     value_str = attr_value
+                # print(
+                #     "'{}' '{}': {}  "
+                #     "".format(
+                #         attr_name,
+                #         type(attr_value),
+                #         value_str,
+                #     ),
+                #     end=""
+                # )
+                if type(attr_value) is str:
+                    # print(" STRING ")
+                    result.append(attr_value)
+                elif type(attr_value) is type:
+                    # print(" TYPE ")
+                    result.extend(
+                        cls.get_flat_list(attr_value.__dict__)
+                    )
+                else:
+                    # print(" UNKNOWN ")
+                    pass
+        # print("*"*42)
+        return result
+
+
+def filter_ASCII_controlls(data):
+    """Remove ASCII controll characters."""
+    code_list = colors.get_flat_list()
+    for el in code_list:
+        data = data.replace(el, "")
+    return data
+
+
+def test_filtering():
+    """Test for filter_ASCII_controlls."""
+    test_string = (
+        colors.fg.lightblue +
+        "Hello " +
+        colors.fg.green +
+        "World " +
+        colors.fg.orange +
+        ":-)" +
+        colors.reset
+    )
+    print("test_string", test_string)
+    test_filtered = filter_ASCII_controlls(test_string)
+    print("test_filtered", test_filtered)
+
 
 def print_colored(mode, data):
+    """Print with coloring similar to blenders info area."""
     printcolor = colors.reset
     if mode == {'INFO'}:
         printcolor = colors.fg.lightblue
@@ -74,25 +149,37 @@ def print_colored(mode, data):
 
 # https://blender.stackexchange.com/a/142317/16634
 def print_blender_console(mode, data):
-    message_type = mode.pop()
-    if message_type is 'WARNING':
-        message_type = 'ERROR'
+    """Print to blenders console area."""
     if bpy:
+        message_type = mode.pop()
+        if message_type is 'WARNING':
+            message_type = 'INFO'
+        elif message_type is 'INFO':
+            message_type = 'OUTPUT'
+        else:
+            message_type = 'INFO'
+        data = filter_ASCII_controlls(str(data))
         for window in bpy.context.window_manager.windows:
             screen = window.screen
             for area in screen.areas:
                 if area.type == 'CONSOLE':
-                    override = {'window': window, 'screen': screen, 'area': area}
+                    override = {
+                        'window': window,
+                        'screen': screen,
+                        'area': area
+                    }
                     bpy.ops.console.scrollback_append(
-                        override, text=str(data), type=message_type)
+                        override, text=data, type=message_type)
 
 
 def print_console(mode, data):
+    """Multi-Print to blenders console area and system console."""
     print_colored(mode, data)
     print_blender_console(mode, data)
 
 
 def print_multi(mode, data, report=None):
+    """Multi-Print to blenders console or info area and system console."""
     print_colored(mode, data)
     if report:
         report(mode, data)
@@ -100,14 +187,20 @@ def print_multi(mode, data, report=None):
         print_blender_console(mode, data)
 
 
-# def print_info(mode, data):
+# def print_blender_info(mode, data):
+#     message_type = mode.pop()
+#     if message_type is 'WARNING':
+#         message_type = 'ERROR'
 #     if bpy:
+#         data = filter_ASCII_controlls(str(data))
 #         for window in bpy.context.window_manager.windows:
 #             screen = window.screen
 #             for area in screen.areas:
-#                 if area.type == 'INFO':
-#                     override = {'window': window, 'screen': screen, 'area': area}
+#                 if area.type == 'CONSOLE':
+#                     override = {
+#                         'window': window,
+#                         'screen': screen,
+#                         'area': area
+#                     }
 #                     bpy.ops.console.scrollback_append(
-#                         override, text=str(data), type="OUTPUT")
-#     else:
-#         print(mode, data)
+#                         override, text=data, type=message_type)

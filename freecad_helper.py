@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+"""Helper tools for FreeCAD python scripts."""
+
 
 def print_obj_header(
     pre_line="",
     show_lists=False,
     show_list_details=False,
 ):
+    """Print header for objects list."""
     print(
         pre_line +
         "{:<15} {:<25} {:<25}"
@@ -46,6 +49,7 @@ def print_obj(
     show_list_details=False,
     end="\n",
 ):
+    """Print object nicely formated."""
     print(
         pre_line +
         "{:<25} {:<15} {:<25}"
@@ -91,6 +95,7 @@ def print_objects(
     show_lists=False,
     show_list_details=False,
 ):
+    """Print objects list."""
     pre_list_entry_space = " "*len(pre_list_entry)
     print_obj_header(
         pre_line=pre_line + pre_list_entry_space,
@@ -109,7 +114,12 @@ def print_objects(
 # ****************************************
 
 
-def filtered_objects(objects, typeid_filter_list=None, include_only_visible=False):
+def filtered_objects(
+    objects,
+    typeid_filter_list=None,
+    include_only_visible=False
+):
+    """Filter list of objects."""
     if typeid_filter_list is None:
         typeid_filter_list = [
             'App::Line',
@@ -134,6 +144,7 @@ def filtered_objects(objects, typeid_filter_list=None, include_only_visible=Fals
 
 
 def get_filtered_objects(doc, typeid_filter_list=None):
+    """Get filterd list of objects."""
     result_objects = filtered_objects(
         doc.Objects,
         typeid_filter_list
@@ -142,6 +153,7 @@ def get_filtered_objects(doc, typeid_filter_list=None):
 
 
 def get_root_objects(doc, filter_list=[]):
+    """Get root list of objects."""
     typeid_filter_list = [
         'App::Line',
         'App::Plane',
@@ -162,6 +174,7 @@ def get_root_objects(doc, filter_list=[]):
 # https://forum.freecadweb.org/viewtopic.php?p=338214&sid=a6dd59fe66c1d807f8537f192fdb14dc#p338214
 
 def is_toplevel_in_list(lst):
+    """Check if objects in list are at top level."""
     if len(lst) == 0:
         return True
     for ob in lst:
@@ -175,6 +188,7 @@ def is_toplevel_in_list(lst):
 
 
 def get_toplevel_objects(doc):
+    """Get top level list of objects."""
     topLevelShapes = []
     for ob in doc.Objects:
         if is_toplevel_in_list(ob.InList):

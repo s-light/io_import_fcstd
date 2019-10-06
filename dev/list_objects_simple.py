@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-List Objects
+List Objects.
 
 Stand-alone / Copy&Paste version
 """
@@ -33,40 +33,116 @@ except ModuleNotFoundError as e:
 
 
 # ******************************************
-def print_obj_header():
+
+def print_obj_header(
+    pre_line="",
+    show_lists=False,
+    show_list_details=False,
+):
+    """Print header for objects list."""
     print(
-        "     {:<15} {:<25} {:<25}"
-        "".format("Name", "Label", "TypeId"),
+        pre_line +
+        "{:<15} {:<25} {:<25}"
+        "".format("Label", "Name", "TypeId"),
         end=''
     )
-    print("p [Parents]  ", end='')
-    print("i [InList]  ", end='')
-    print("o [OutList]  ", end='')
-    print("g [Group]  ", end='')
+    if show_lists:
+        print(
+            "{:>2} {:>2} {:>2} {:>2}"
+            "".format(
+                "P",
+                "I",
+                "O",
+                "G",
+            ),
+            end=''
+        )
+        if show_list_details:
+            print(
+                (
+                    "    {:<10}" * 4
+                ).format(
+                    '[Parents]',
+                    '[InList]',
+                    '[OutList]',
+                    '[Group]'
+                ),
+                end=''
+            )
     print()
 
 
-def print_obj(obj):
+def print_obj(
+    obj,
+    pre_line="",
+    show_lists=False,
+    show_list_details=False,
+    end="\n",
+):
+    """Print object nicely formated."""
     print(
-        "obj: {:<15} {:<25} {:<25}"
-        "".format(obj.Name, obj.Label, obj.TypeId),
+        pre_line +
+        "{:<25} {:<15} {:<25}"
+        "".format(obj.Label, obj.Name, obj.TypeId),
         end=''
     )
-    print("p:{}  ".format(len(obj.Parents)), end='')
-    print("i:{}  ".format(len(obj.InList)), end='')
-    print("o:{}  ".format(len(obj.OutList)), end='')
-    if hasattr(obj, 'Group'):
-        print("g:{}  ".format(len(obj.Group)), end='')
-    print()
+    if show_lists:
+        group_count = '_'
+        if hasattr(obj, 'Group'):
+            group_count = len(obj.Group)
+        print(
+            "{:>2} {:>2} {:>2} {:>2}"
+            "".format(
+                len(obj.Parents),
+                len(obj.InList),
+                len(obj.OutList),
+                group_count
+            ),
+            end=''
+        )
+        if show_list_details:
+            group = None
+            if hasattr(obj, 'Group'):
+                group = obj.Group
+            print(
+                (
+                    "    {:<10}" * 4
+                ).format(
+                    str(obj.Parents),
+                    str(obj.InList),
+                    str(obj.OutList),
+                    str(group)
+                ),
+                end=''
+            )
+    print("", end=end)
 
 
-def print_objects(objects):
-    print_obj_header()
+def print_objects(
+    objects,
+    pre_line="",
+    pre_list_entry="* ",
+    show_lists=False,
+    show_list_details=False,
+):
+    """Print objects list."""
+    pre_list_entry_space = " "*len(pre_list_entry)
+    print_obj_header(
+        pre_line=pre_line + pre_list_entry_space,
+        show_lists=show_lists,
+        show_list_details=show_list_details,
+    )
     for obj in objects:
-        print_obj(obj)
+        print_obj(
+            obj,
+            pre_line=pre_line + pre_list_entry,
+            show_lists=show_lists,
+            show_list_details=show_list_details,
+        )
 
 
 def print_obj_with_label(doc, label):
+    """Print object with given label."""
     obj = doc.getObjectsByLabel(label)
     # print(obj)
     if len(obj) > 0:

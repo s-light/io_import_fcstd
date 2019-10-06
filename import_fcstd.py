@@ -39,7 +39,13 @@ class FreeCAD_xml_handler(xml.sax.ContentHandler):
             self.current = attributes["name"]
         elif tag == "Property":
             name = attributes["name"]
-            if name in ["Visibility", "ShapeColor", "Transparency", "DiffuseColor"]:
+            element_names = [
+                "Visibility",
+                "ShapeColor",
+                "Transparency",
+                "DiffuseColor"
+            ]
+            if name in element_names:
                 self.currentprop = name
         elif tag == "Bool":
             if attributes["value"] == "true":
@@ -90,6 +96,7 @@ class ImportFcstd(object):
         obj_name_prefix="",
         report=None
     ):
+        """Init."""
         super(ImportFcstd, self).__init__()
         self.config = {
             "filename": filename,
@@ -119,9 +126,11 @@ class ImportFcstd(object):
             self.typeid_filter_list.append('Sketcher::SketchObject')
 
     def print_report(self, mode, data):
+        """Multi print handling."""
         b_helper.print_multi(mode, data, self.report)
 
     def print_obj(self, obj, pre_line="", post_line="", end="\n"):
+        """Print object with nice formating."""
         message = (
             pre_line +
             "'{}' ('{}' <{}>)"
@@ -135,9 +144,11 @@ class ImportFcstd(object):
         )
 
     def get_obj_label(self, obj):
+        """Get object label with optional prefix."""
         return self.config["obj_name_prefix"] + obj.Label
 
     def rename_old_data(self, data, data_label):
+        """Recusive add '_old' to data object."""
         if data_label in data:
             name_old = data[data_label].name + "_old"
             if name_old in data:
@@ -147,6 +158,7 @@ class ImportFcstd(object):
 
     # material
     def get_obj_Transparency(self, obj_Name):
+        """Get object Transparency and convert to blender units."""
         alpha = 1.0
         if "Transparency" in self.guidata[obj_Name]:
             if self.guidata[obj_Name]["Transparency"] > 0:
@@ -154,12 +166,14 @@ class ImportFcstd(object):
         return alpha
 
     def get_obj_ShapeColor(self, obj_Name):
+        """Get object ShapeColor and convert to blender units."""
         rgb = (0.5, 0.5, 0.5)
         if "ShapeColor" in self.guidata[obj_Name]:
             rgb = self.guidata[obj_Name]["ShapeColor"]
         return rgb
 
     def get_obj_DiffuseColor(self, obj_Name, i):
+        """Get object DiffuseColor and convert to blender units."""
         # DiffuseColor stores int values, Blender use floats
         rgba = tuple([
             float(x) / 255.0
@@ -168,6 +182,7 @@ class ImportFcstd(object):
         return rgba
 
     def get_obj_rgba(self, obj_Name, mat_index=None):
+        """Get object rgba value in blender usable format."""
         if mat_index:
             rgba = self.get_obj_DiffuseColor(obj_Name, mat_index)
             # FreeCAD stores transparency, not alpha
@@ -182,6 +197,7 @@ class ImportFcstd(object):
         return rgba
 
     def create_new_bmat(self, bmat_name, rgba, func_data):
+        """Create new blender material."""
         bmat = bpy.data.materials.new(name=bmat_name)
         bmat.use_nodes = True
         # link bmat to PrincipledBSDFWrapper
@@ -197,6 +213,7 @@ class ImportFcstd(object):
         return bmat
 
     def handle_material_per_face(self, func_data, bobj, fi, objmats, i):
+        """Handle material for face."""
         # Create new mats and attribute faces to them
         # DiffuseColor stores int values, Blender use floats
         rgba = self.get_obj_rgba(func_data["obj"].Name, i)
@@ -223,6 +240,7 @@ class ImportFcstd(object):
         fi += func_data["matindex"][i]
 
     def handle_material_multi(self, func_data, bobj):
+        """Handle multi material."""
         # we have per-face materials.
         fi = 0
         objmats = []
@@ -230,6 +248,7 @@ class ImportFcstd(object):
             self.handle_material_per_face(func_data, bobj, fi, objmats, i)
 
     def handle_material_single(self, func_data, bobj):
+        """Handle single material."""
         # one material for the whole object
         rgba = self.get_obj_rgba(func_data["obj"].Name)
         bmat = None
@@ -245,6 +264,7 @@ class ImportFcstd(object):
         bobj.data.materials.append(bmat)
 
     def handle_material_new(self, func_data, bobj):
+        """Handle material creation."""
         # check if we have a material at all...
         if func_data["obj"].Name in self.guidata:
             # check if we have 'per face' or 'object' coloring.
@@ -304,7 +324,8 @@ class ImportFcstd(object):
                     "Replacing existing object mesh: {}"
                     "".format(obj_label)
                 )
-                # rename old mesh - this way the new mesh can get the orig. name.
+                # rename old mesh -
+                # this way the new mesh can get the original name.
                 self.rename_old_data(bpy.data.meshes, obj_label)
 
         bmesh = bpy.data.meshes.new(name=obj_label)
@@ -343,6 +364,7 @@ class ImportFcstd(object):
 
     # shape
     def handle_shape_edge(self, func_data, edge):
+        """Handle edges that are not part of a face."""
         if self.hascurves(edge):
             # TODO use tessellation value
             dv = edge.discretize(9)
@@ -367,7 +389,8 @@ class ImportFcstd(object):
                 e.append(func_data["verts"].index(v))
             func_data["edges"].append(e)
 
-    def handle_shape_face_as_polygon(self, func_data, face, faceedges):
+    def convert_face_to_polygon(self, func_data, face, faceedges):
+        """Convert face to polygons."""
         import Part
         if (
             (len(face.Wires) > 1)
@@ -402,7 +425,8 @@ class ImportFcstd(object):
             v2 = ov[1].Point.sub(c)
             n = face.normalAt(0, 0)
             if (v1.cross(v2)).getAngle(n) > 1.57:
-                # inverting func_data["verts"] order if the direction is couterclockwise
+                # inverting func_data["verts"] order
+                # if the direction is counterclockwise
                 f.reverse()
             func_data["faces"].append(f)
             func_data["matindex"].append(1)
@@ -410,6 +434,7 @@ class ImportFcstd(object):
             faceedges.append(e.hashCode())
 
     def handle_shape_faces(self, func_data, shape, faceedges):
+        """Convert faces to polygons."""
         if TRIANGULATE:
             # triangulate and make faces
             rawdata = shape.tessellate(self.config["tessellation"])
@@ -423,7 +448,7 @@ class ImportFcstd(object):
         else:
             # write FreeCAD faces as polygons when possible
             for face in shape.Faces:
-                self.handle_shape_face_as_polygon(func_data, face, faceedges)
+                self.convert_face_to_polygon(func_data, face, faceedges)
 
     def create_mesh_from_shape(self, func_data):
         """Create mesh from shape."""
@@ -444,7 +469,7 @@ class ImportFcstd(object):
 
     # mesh
     def create_mesh_from_mesh(self, func_data):
-        # convert freecad mesh to blender mesh
+        """Convert freecad mesh to blender mesh."""
         mesh = func_data["obj"].Mesh
         if self.config["placement"]:
             self.config["placement"] = func_data["obj"].Placement
@@ -456,6 +481,7 @@ class ImportFcstd(object):
 
     # part
     def part_collection_add_or_update(self, func_data, collection_label):
+        """Part-Collection handle add or update."""
         temp_collection = None
         # if self.config["update"]:
         #     if collection_label in bpy.data.collections:
@@ -475,7 +501,7 @@ class ImportFcstd(object):
         func_data["collection"] = temp_collection
 
     def handle_part(self, func_data):
-        """Handle part."""
+        """Handle App:Part type."""
         pre_line = func_data["pre_line"]
         part_label = self.get_obj_label(func_data["obj"])
         # print(pre_line + "handle_part: '{}'".format(part_label))
@@ -524,8 +550,14 @@ class ImportFcstd(object):
         func_data["collection_parent"] = None
 
     # main object import
-    def import_obj(self, obj=None, collection=None, collection_parent=None, pre_line=""):
-        "Import Object."
+    def import_obj(
+        self,
+        obj=None,
+        collection=None,
+        collection_parent=None,
+        pre_line=""
+    ):
+        """Import Object."""
         # import some FreeCAD modules needed below.
         # After "import FreeCAD" these modules become available
         # import Part
@@ -592,6 +624,7 @@ class ImportFcstd(object):
         return result
 
     def import_doc_content(self, doc):
+        """Import document content = filterd objects."""
         obj_list = fc_helper.get_root_objects(
             doc,
             filter_list=self.typeid_filter_list
@@ -623,6 +656,7 @@ class ImportFcstd(object):
                 self.print_obj(obj, pre_line=pre, post_line=post)
 
     def prepare_collection(self):
+        """Prepare main import collection."""
         if self.config["update"]:
             if self.doc_filename in bpy.data.collections:
                 self.fcstd_collection = bpy.data.collections[self.doc_filename]
@@ -660,6 +694,7 @@ class ImportFcstd(object):
         # print ("self.guidata:",self.guidata)
 
     def prepare_freecad_import(self):
+        """Prepare FreeCAD import."""
         # append the FreeCAD path specified in addon preferences
         user_preferences = bpy.context.preferences
         addon_prefs = user_preferences.addons["io_import_fcstd"].preferences
@@ -701,7 +736,8 @@ class ImportFcstd(object):
         # with FreeCAD.open(self.config["filename"]) as doc:
         # so we use the classic try finally block:
         try:
-            # doc = FreeCAD.open('/home/stefan/mydata/freecad/tests/linking_test/Linking.FCStd')
+            doc = FreeCAD.open(
+                "/home/stefan/mydata/freecad/tests/linking_test/Linking.FCStd")
             doc = FreeCAD.open(self.config["filename"])
             docname = doc.Name
             self.doc_filename = docname + ".FCStd"
@@ -713,16 +749,14 @@ class ImportFcstd(object):
                 )
                 return {'CANCELLED'}
             else:
-                # print ("Transferring",len(doc.Objects),"objects to Blender")
                 self.prepare_collection()
                 self.import_doc_content(doc)
         except Exception as e:
             self.config["report"]({'ERROR'}, str(e))
             raise e
         finally:
-            # FreeCAD.closeDocument('Linking')
             FreeCAD.closeDocument(docname)
-        print("Import finished without errors")
+        print("Import finished.")
         return {'FINISHED'}
 
 
