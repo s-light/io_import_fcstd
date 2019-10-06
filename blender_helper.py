@@ -182,6 +182,7 @@ def print_multi(mode, data, report=None):
     """Multi-Print to blenders console or info area and system console."""
     print_colored(mode, data)
     if report:
+        data = filter_ASCII_controlls(str(data))
         report(mode, data)
     else:
         print_blender_console(mode, data)

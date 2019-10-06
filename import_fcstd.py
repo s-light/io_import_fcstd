@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+"""Import FreeCAD files to blender."""
+
 import sys
 import bpy
 import xml.sax
@@ -228,7 +230,8 @@ class ImportFcstd(object):
             if rgba in objmats:
                 bmat = bobj.data.materials[objmats.index(rgba)]
         if not bmat:
-            bmat_name = self.get_obj_label(func_data["obj"]) + "_" + str(len(objmats))
+            bmat_name = self.get_obj_label(
+                func_data["obj"]) + "_" + str(len(objmats))
             bmat = self.create_new_bmat(bmat_name, rgba, func_data)
             objmats.append(rgba)
             # TODO: please check if this is really correct..
@@ -491,7 +494,8 @@ class ImportFcstd(object):
         # if temp_collection:
         #     bpy.context.scene.collection.children.link(self.fcstd_collection)
         # else:
-        #     func_data["current_collection"] = bpy.data.collections.new(collection_label)
+        #     func_data["current_collection"] = \
+        #         bpy.data.collections.new(collection_label)
         if collection_label in bpy.data.collections:
             temp_collection = bpy.data.collections[collection_label]
         else:
@@ -736,8 +740,8 @@ class ImportFcstd(object):
         # with FreeCAD.open(self.config["filename"]) as doc:
         # so we use the classic try finally block:
         try:
-            doc = FreeCAD.open(
-                "/home/stefan/mydata/freecad/tests/linking_test/Linking.FCStd")
+            # doc = FreeCAD.open(
+            #     "/home/stefan/mydata/freecad/tests/linking_test/Linking.FCStd")
             doc = FreeCAD.open(self.config["filename"])
             docname = doc.Name
             self.doc_filename = docname + ".FCStd"
@@ -761,7 +765,7 @@ class ImportFcstd(object):
 
 
 def main_test():
-    "Main Tests."
+    """Tests."""
     pass
 
 
