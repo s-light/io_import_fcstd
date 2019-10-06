@@ -116,9 +116,11 @@ class ImportFcstd(object):
         self.report = report
 
         print('config', self.config)
-        self.guidata = {}
-        self.fcstd_collection = None
+        self.doc = None
         self.doc_filename = None
+        self.guidata = {}
+
+        self.fcstd_collection = None
 
         self.typeid_filter_list = [
             'GeoFeature',
@@ -282,7 +284,9 @@ class ImportFcstd(object):
             else:
                 self.handle_material_single(func_data, bobj)
 
+    # ##########################################
     # object handling
+
     def hascurves(self, shape):
         """Check if shape has curves."""
         import Part
@@ -365,7 +369,82 @@ class ImportFcstd(object):
         # bpy.context.scene.objects.active = func_data["obj"]
         # obj.select = True
 
-    # shape
+    def sub_collection_add_or_update(self, func_data, collection_label):
+        """Part-Collection handle add or update."""
+        temp_collection = None
+        # if self.config["update"]:
+        #     if collection_label in bpy.data.collections:
+        #         temp_collection = bpy.data.collections[collection_label]
+        # else:
+        #     self.rename_old_data(bpy.data.collections, collection_label)
+        # if temp_collection:
+        #     bpy.context.scene.collection.children.link(self.fcstd_collection)
+        # else:
+        #     func_data["current_collection"] = \
+        #         bpy.data.collections.new(collection_label)
+        if collection_label in bpy.data.collections:
+            temp_collection = bpy.data.collections[collection_label]
+        else:
+            temp_collection = bpy.data.collections.new(collection_label)
+            func_data["collection"].children.link(temp_collection)
+        func_data["collection_parent"] = func_data["collection"]
+        func_data["collection"] = temp_collection
+
+    def handle__sub_objects(self, func_data, sub_objects):
+        """Handle sub objects."""
+        pre_line = func_data["pre_line"]
+        sub_label = self.get_obj_label(func_data["obj"])
+        # print(pre_line + "handle_part: '{}'".format(sub_label))
+        self.sub_collection_add_or_update(func_data, sub_label)
+        if len(sub_objects) > 0:
+            sub_objects = fc_helper.filtered_objects(
+                sub_objects,
+                include_only_visible=True
+            )
+            print(
+                b_helper.colors.bold
+                + b_helper.colors.fg.purple
+                + pre_line + "Import Recusive:"
+                + b_helper.colors.reset
+            )
+            for obj in sub_objects:
+                self.print_obj(obj, pre_line + "- ")
+                self.import_obj(
+                    obj=obj,
+                    collection=func_data["collection"],
+                    collection_parent=func_data["collection_parent"],
+                    pre_line=pre_line + '    '
+                )
+        else:
+            print(
+                b_helper.colors.fg.darkgrey
+                + pre_line + "→ no childs."
+                + b_helper.colors.reset
+            )
+        # reset current collection
+        func_data["collection"] = func_data["collection_parent"]
+        func_data["collection_parent"] = None
+
+    # Arrays and similar
+    def handle__ObjectWithElementList(self, func_data):
+        """Handle Part::Feature objects."""
+        pre_line = func_data["pre_line"]
+        obj = func_data["obj"]
+        self.config["report"]({'WARNING'}, (
+            pre_line +
+            "'{}' ('{}') of type '{}': "
+            "Warning: ElementList handling is highly experimental!!"
+            "".format(obj.Label, obj.Name, obj.TypeId)
+        ))
+        self.handle__sub_objects(
+            func_data,
+            func_data["obj"].ElementList
+        )
+
+    # ##########################################
+    # 'real' object types
+
+    # Part::Feature
     def handle_shape_edge(self, func_data, edge):
         """Handle edges that are not part of a face."""
         if self.hascurves(edge):
@@ -470,8 +549,31 @@ class ImportFcstd(object):
             if not (edge.hashCode() in faceedges):
                 self.handle_shape_edge(func_data, edge)
 
-    # mesh
-    def create_mesh_from_mesh(self, func_data):
+    def handle__PartFeature(self, func_data):
+        """Handle Part::Feature objects."""
+        self.create_mesh_from_shape(func_data)
+
+    # Part::FeaturePhython
+    def handle__PartFeaturePython_Array(self, func_data):
+        """Handle Part::Feature objects."""
+        pre_line = func_data["pre_line"]
+        print(
+            pre_line + "ElementList:",
+            func_data["obj"].ElementList
+        )
+        print(pre_line + "Count:", func_data["obj"].Count)
+        print(pre_line + "ExpandArray:", func_data["obj"].ExpandArray)
+        print(pre_line + "expand Array")
+        func_data["obj"].ExpandArray = True
+        print(pre_line + "ExpandArray:", func_data["obj"].ExpandArray)
+        print(
+            pre_line + "ElementList:",
+            func_data["obj"].ElementList
+        )
+        self.handle__ObjectWithElementList(func_data)
+
+    # Mesh::Feature
+    def handle__MeshFeature(self, func_data):
         """Convert freecad mesh to blender mesh."""
         mesh = func_data["obj"].Mesh
         if self.config["placement"]:
@@ -483,76 +585,30 @@ class ImportFcstd(object):
         func_data["faces"] = t[1]
 
     # part
-    def part_collection_add_or_update(self, func_data, collection_label):
-        """Part-Collection handle add or update."""
-        temp_collection = None
-        # if self.config["update"]:
-        #     if collection_label in bpy.data.collections:
-        #         temp_collection = bpy.data.collections[collection_label]
-        # else:
-        #     self.rename_old_data(bpy.data.collections, collection_label)
-        # if temp_collection:
-        #     bpy.context.scene.collection.children.link(self.fcstd_collection)
-        # else:
-        #     func_data["current_collection"] = \
-        #         bpy.data.collections.new(collection_label)
-        if collection_label in bpy.data.collections:
-            temp_collection = bpy.data.collections[collection_label]
-        else:
-            temp_collection = bpy.data.collections.new(collection_label)
-            func_data["collection"].children.link(temp_collection)
-        func_data["collection_parent"] = func_data["collection"]
-        func_data["collection"] = temp_collection
-
-    def handle_part(self, func_data):
+    def handle__AppPart(self, func_data):
         """Handle App:Part type."""
         pre_line = func_data["pre_line"]
-        part_label = self.get_obj_label(func_data["obj"])
-        # print(pre_line + "handle_part: '{}'".format(part_label))
-        self.part_collection_add_or_update(func_data, part_label)
-        # print(pre_line + "check sub elements")
-        group = func_data["obj"].Group
-        if len(group) > 0:
-            # print(pre_line + "Group: ", group)
-            # pre_sub = pre_line + "|   "
-            # print(pre_line + "|" + ("*"*42))
-            # print(pre_sub)
-            # print(pre_sub + "SUB objects")
-            # fc_helper.print_objects(group)
-            # print(pre_sub)
-            sub_objects = fc_helper.filtered_objects(
-                group,
-                include_only_visible=True
-            )
-            # print(pre_line + "|" + ("*"*42))
-            # print(pre_sub + "Filterd SUB objects")
-            # fc_helper.print_objects(sub_objects, pre_line=pre_sub)
-            # print(pre_sub)
-            # print(pre_line + "|" + ("*"*42))
-            print(
-                b_helper.colors.bold
-                + b_helper.colors.fg.purple
-                + pre_line + "Import Recusive:"
-                + b_helper.colors.reset
-            )
-            for obj in sub_objects:
-                self.print_obj(obj, pre_line + "- ")
-                self.import_obj(
-                    obj=obj,
-                    collection=func_data["collection"],
-                    collection_parent=func_data["collection_parent"],
-                    pre_line=pre_line + '    '
-                )
-        else:
-            print(
-                b_helper.colors.fg.darkgrey
-                + pre_line + "→ no group childs."
-                + b_helper.colors.reset
-            )
-        # reset current collection
-        func_data["collection"] = func_data["collection_parent"]
-        func_data["collection_parent"] = None
+        self.handle__sub_objects(
+            func_data,
+            func_data["obj"].Group
+        )
 
+    # App::Link
+    def handle__AppLink(self, func_data):
+        """Handle App::Link objects."""
+
+    def handle__AppLinkElement(self, func_data):
+        """Handle App::LinkElement objects."""
+        obj = func_data["obj"].LinkedObject
+        self.config["report"]({'ERROR'}, (
+            pre_line +
+            "'{}' ('{}') of type '{}': "
+            "ERROR: handle__AppLinkElement not implemented!"
+            "".format(obj.Label, obj.Name, obj.TypeId)
+        ))
+        pass
+
+    # ##########################################
     # main object import
     def import_obj(
         self,
@@ -585,14 +641,38 @@ class ImportFcstd(object):
         # func_data["matindex"]
 
         if obj:
-            if obj.isDerivedFrom("Part::Feature"):
-                self.create_mesh_from_shape(func_data)
+            # if hasattr(obj, 'ElementList'):
+            #     self.config["report"]({'WARNING'}, (
+            #         pre_line +
+            #         "'{}' ('{}') of type '{}': "
+            #         "Warning: ElementList handling is highly experimental!!"
+            #         "".format(obj.Label, obj.Name, obj.TypeId)
+            #     ))
+            #     self.handle__ObjectWithElementList(func_data)
+            if (
+                obj.isDerivedFrom("Part::FeaturePython")
+                and hasattr(obj, 'ExpandArray')
+                and hasattr(obj, 'ElementList')
+            ):
+                self.handle__PartFeaturePython_Array(func_data)
+            elif obj.isDerivedFrom("Part::Feature"):
+                self.handle__PartFeature(func_data)
             elif obj.isDerivedFrom("Mesh::Feature"):
-                self.create_mesh_from_mesh(func_data)
+                self.handle__MeshFeature(func_data)
             # elif obj.isDerivedFrom("PartDesign::Body"):
             #     self.create_mesh_from_Body(func_data)
+            # elif obj.isDerivedFrom("XXXXXX"):
+            #     self.handle__XXXXXX(func_data)
             elif obj.isDerivedFrom("App::Part"):
-                self.handle_part(func_data)
+                self.handle__AppPart(func_data)
+            # elif obj.isDerivedFrom("App::LinkElement"):
+            #     self.config["report"]({'WARNING'}, (
+            #         pre_line +
+            #         "'{}' ('{}') of type '{}': "
+            #         "Warning: LinkElement handling is highly experimental!!"
+            #         "".format(obj.Label, obj.Name, obj.TypeId)
+            #     ))
+            #     self.handle__AppLinkElement(func_data)
             # elif obj.isDerivedFrom("App::Link"):
             #     self.config["report"]({'WARNING'}, (
             #         pre_line +
@@ -600,7 +680,7 @@ class ImportFcstd(object):
             #         "Warning: Link handling is highly experimental!!"
             #         "".format(obj.Label, obj.Name, obj.TypeId)
             #     ))
-            #     self.handle_link(func_data)
+            #     self.handle__AppLink(func_data)
             else:
                 self.config["report"]({'WARNING'}, (
                     pre_line +
@@ -753,6 +833,13 @@ class ImportFcstd(object):
                 )
                 return {'CANCELLED'}
             else:
+                self.doc = doc
+                self.config["report"]({'INFO'}, "recompute..")
+                self.doc.recompute()
+                self.config["report"]({'INFO'}, "importLinks..")
+                self.doc.importLinks()
+                self.config["report"]({'INFO'}, "recompute..")
+                self.doc.recompute()
                 self.prepare_collection()
                 self.import_doc_content(doc)
         except Exception as e:

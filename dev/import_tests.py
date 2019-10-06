@@ -137,7 +137,8 @@ def main_test():
     print("*"*42)
     print("run import_tests")
 
-    filename_relative = "./dev/freecad_linking_example/assembly.FCStd"
+    # filename_relative = "./dev/freecad_linking_example/assembly.FCStd"
+    filename_relative = "./dev/freecad_linking_example/assembly__export.FCStd"
     print("FreeCAD document:", filename_relative)
     filename = os.path.join(base_dir, filename_relative)
 
