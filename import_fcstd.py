@@ -771,7 +771,7 @@ class ImportFcstd(object):
         if len(obj.ElementList) > 0:
             self.handle__ObjectWithElementList(func_data)
         else:
-            # self.sub_collection_add_or_update(func_data, linkedobj_label)
+            self.sub_collection_add_or_update(func_data, obj_label)
             self.handle__AppLinkElement(func_data)
 
     def handle__AppLinkElement(self, func_data):
