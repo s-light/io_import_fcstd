@@ -739,7 +739,7 @@ class ImportFcstd(object):
             if base_collection:
                 # hide this internal object.
                 # we use only the instances..
-                base_collection.hide_render = True
+                base_collection.hide_render = False
                 base_collection.hide_select = True
                 base_collection.hide_viewport = False
             func_data["collection"] = func_data["collection_parent"]
