@@ -15,37 +15,37 @@ import os.path
 
 #####################
 # Begin command Part_SimpleCopy
-doc = App.getDocument('lamp')
-obj = doc.getObject('Body001')
-__shape = Part.getShape(
-    obj,
-    '',
-    needSubElement=False,
-    refine=False
-)
-App.ActiveDocument.addObject('Part::Feature', 'Body001').Shape = __shape
-App.ActiveDocument.ActiveObject.Label = obj.Label
-obj_new = doc.getObject('Body001001')
-
-obj_new.ViewObject.ShapeColor = \
-    getattr(
-        obj.getLinkedObject(True).ViewObject,
-        'ShapeColor',
-        obj_new.ViewObject.ShapeColor
-    )
-obj_new.ViewObject.LineColor = \
-    getattr(
-        obj.getLinkedObject(True).ViewObject,
-        'LineColor',
-        obj_new.ViewObject.LineColor
-    )
-obj_new.ViewObject.PointColor = \
-    getattr(
-        obj.getLinkedObject(True).ViewObject,
-        'PointColor',
-        obj_new.ViewObject.PointColor
-    )
-App.ActiveDocument.recompute()
+# doc = App.getDocument('lamp')
+# obj = doc.getObject('Body001')
+# __shape = Part.getShape(
+#     obj,
+#     '',
+#     needSubElement=False,
+#     refine=False
+# )
+# App.ActiveDocument.addObject('Part::Feature', 'Body001').Shape = __shape
+# App.ActiveDocument.ActiveObject.Label = obj.Label
+# obj_new = doc.getObject('Body001001')
+#
+# obj_new.ViewObject.ShapeColor = \
+#     getattr(
+#         obj.getLinkedObject(True).ViewObject,
+#         'ShapeColor',
+#         obj_new.ViewObject.ShapeColor
+#     )
+# obj_new.ViewObject.LineColor = \
+#     getattr(
+#         obj.getLinkedObject(True).ViewObject,
+#         'LineColor',
+#         obj_new.ViewObject.LineColor
+#     )
+# obj_new.ViewObject.PointColor = \
+#     getattr(
+#         obj.getLinkedObject(True).ViewObject,
+#         'PointColor',
+#         obj_new.ViewObject.PointColor
+#     )
+# App.ActiveDocument.recompute()
 # End command Part_SimpleCopy
 #####################
 
@@ -86,18 +86,23 @@ def object_create_copy(obj_source):
     return obj_new
 
 
+def find_Parent(obj):
+    """Find Parent Part object for obj."""
+    result_obj = None
+    # this findes the 'last' Part..
+    # but as fare as i know there should only be one in this list..
+    for x in obj.InList:
+        if (
+            x.isDerivedFrom("App::Part")
+        ):
+            result_obj = x
+    return result_obj
+
+
 def simpleCopySelection():
     """Create a simplifyed copy of selected objects."""
     # ideas / tests / original:
-    # App.ActiveDocument.addObject('Part::Feature','Box').Shape=App.ActiveDocument.Box.Shape
-    # App.ActiveDocument.ActiveObject.Label=App.ActiveDocument.Box.Label
-    # Gui.ActiveDocument.ActiveObject.ShapeColor=Gui.ActiveDocument.Fillet.ShapeColor
-    # Gui.ActiveDocument.ActiveObject.LineColor=Gui.ActiveDocument.Fillet.LineColor
-    # Gui.ActiveDocument.ActiveObject.PointColor=Gui.ActiveDocument.Fillet.PointColor
-    # App.ActiveDocument.recompute()
-    # for proplabel in Gui.ActiveDocument.Box.PropertiesList:
-    #   App.ActiveDocument.ActiveObject[proplabel] =
-    #   App.ActiveDocument.Box[proplabel]
+    # push into current group..
 
     App = FreeCAD
     Gui = FreeCADGui
@@ -108,6 +113,11 @@ def simpleCopySelection():
         obj_new = object_create_copy(obj)
         obj_new.ViewObject.Visibility = True
         obj.ViewObject.Visibility = False
+        # try to add it at same tree location
+        obj_parent = find_Parent(obj)
+        if obj_parent:
+            obj_parent.addObject(obj_new)
+
     #
 
     App.ActiveDocument.recompute()

@@ -149,7 +149,28 @@ class ImportFcstd(object):
 
     def get_obj_label(self, obj):
         """Get object label with optional prefix."""
-        return self.config["obj_name_prefix"] + obj.Label
+        label = None
+        if hasattr(obj, "LinkedObject"):
+            label = (
+                obj.LinkedObject.Label
+                + "__"
+                + obj.Label
+            )
+        else:
+            label = obj.Label
+        if label:
+            self.config["obj_name_prefix"] + label
+        return label
+
+    def get_linkedobj_label(self, obj):
+        """Get linkedobject label with optional prefix."""
+        label = None
+        if hasattr(obj, "LinkedObject"):
+            label = (
+                self.config["obj_name_prefix"]
+                + obj.LinkedObject.Label
+            )
+        return label
 
     def rename_old_data(self, data, data_label):
         """Recusive add '_old' to data object."""
@@ -295,7 +316,7 @@ class ImportFcstd(object):
                 return True
         return False
 
-    def handle_placement(self, bobj):
+    def handle_placement(self, bobj, enable_scale=True):
         """Handle placement."""
         if self.config["placement"]:
             # print ("placement:",placement)
@@ -311,11 +332,12 @@ class ImportFcstd(object):
                 )
                 bobj.rotation_quaternion = (q)
                 bobj.rotation_mode = m
-            bobj.scale = (
-                self.config["scale"],
-                self.config["scale"],
-                self.config["scale"]
-            )
+            if enable_scale:
+                bobj.scale = (
+                    self.config["scale"],
+                    self.config["scale"],
+                    self.config["scale"]
+                )
 
     def add_or_update_blender_obj(self, func_data):
         """Create or update object with mesh and material data."""
@@ -354,6 +376,7 @@ class ImportFcstd(object):
             bobj = bpy.data.objects.new(obj_label, bmesh)
             self.handle_placement(bobj)
             self.handle_material_new(func_data, bobj)
+            func_data["bobj"] = bobj
 
         if self.config['update']:
             if bobj.name not in func_data["collection"].objects:
@@ -390,7 +413,12 @@ class ImportFcstd(object):
         func_data["collection_parent"] = func_data["collection"]
         func_data["collection"] = temp_collection
 
-    def handle__sub_objects(self, func_data, sub_objects):
+    def handle__sub_objects(
+        self,
+        func_data,
+        sub_objects,
+        include_only_visible=True
+    ):
         """Handle sub objects."""
         pre_line = func_data["pre_line"]
         sub_label = self.get_obj_label(func_data["obj"])
@@ -399,7 +427,7 @@ class ImportFcstd(object):
         if len(sub_objects) > 0:
             sub_objects = fc_helper.filtered_objects(
                 sub_objects,
-                include_only_visible=True
+                include_only_visible=include_only_visible
             )
             print(
                 b_helper.colors.bold
@@ -422,23 +450,28 @@ class ImportFcstd(object):
                 + b_helper.colors.reset
             )
         # reset current collection
-        func_data["collection"] = func_data["collection_parent"]
-        func_data["collection_parent"] = None
+        # func_data["collection"] = func_data["collection_parent"]
+        # func_data["collection_parent"] = None
 
     # Arrays and similar
     def handle__ObjectWithElementList(self, func_data):
         """Handle Part::Feature objects."""
-        pre_line = func_data["pre_line"]
-        obj = func_data["obj"]
-        self.config["report"]({'WARNING'}, (
-            pre_line +
-            "'{}' ('{}') of type '{}': "
-            "Warning: ElementList handling is highly experimental!!"
-            "".format(obj.Label, obj.Name, obj.TypeId)
-        ))
+        # pre_line = func_data["pre_line"]
+        # obj = func_data["obj"]
+        # self.config["report"]({'WARNING'}, (
+        #     pre_line +
+        #     "'{}' ('{}') of type '{}': "
+        #     "Warning: ElementList handling is highly experimental!!"
+        #     "".format(obj.Label, obj.Name, obj.TypeId)
+        # ))
+        # fc_helper.print_objects(
+        #     func_data["obj"].ElementList,
+        #     pre_line=pre_line
+        # )
         self.handle__sub_objects(
             func_data,
-            func_data["obj"].ElementList
+            func_data["obj"].ElementList,
+            include_only_visible=False
         )
 
     # ##########################################
@@ -564,7 +597,9 @@ class ImportFcstd(object):
         print(pre_line + "Count:", func_data["obj"].Count)
         print(pre_line + "ExpandArray:", func_data["obj"].ExpandArray)
         print(pre_line + "expand Array")
+        # TODO: this currently has only any effect in the GUI
         func_data["obj"].ExpandArray = True
+        self.doc.recompute()
         print(pre_line + "ExpandArray:", func_data["obj"].ExpandArray)
         print(
             pre_line + "ElementList:",
@@ -596,17 +631,94 @@ class ImportFcstd(object):
     # App::Link
     def handle__AppLink(self, func_data):
         """Handle App::Link objects."""
-
-    def handle__AppLinkElement(self, func_data):
-        """Handle App::LinkElement objects."""
+        pre_line = func_data["pre_line"]
         obj = func_data["obj"].LinkedObject
         self.config["report"]({'ERROR'}, (
             pre_line +
             "'{}' ('{}') of type '{}': "
-            "ERROR: handle__AppLinkElement not implemented!"
+            "ERROR: handle__AppLink not implemented!"
             "".format(obj.Label, obj.Name, obj.TypeId)
         ))
-        pass
+
+    def handle__AppLinkElement(self, func_data):
+        """Handle App::LinkElement objects."""
+        pre_line = func_data["pre_line"]
+        obj = func_data["obj"]
+        obj_linked = func_data["obj"].LinkedObject.LinkedObject
+        # self.config["report"]({'ERROR'}, (
+        #     pre_line +
+        #     "'{}' ('{}') of type '{}': "
+        #     "ERROR: handle__AppLinkElement EXPERIMENTAL!"
+        #     "".format(obj.Label, obj.Name, obj.TypeId)
+        # ))
+
+        print(pre_line + "collection:", func_data["collection"])
+
+        obj_label = self.get_obj_label(obj)
+        print(pre_line + "obj_label:", obj_label)
+        linkedobj_label = self.get_linkedobj_label(obj)
+        print(pre_line + "linkedobj_label:", linkedobj_label)
+        # obj_linked_label = self.get_obj_label(obj_linked)
+        # print(pre_line + "obj_linked_label:", obj_linked_label)
+        # fc_helper.print_obj(obj, pre_line=pre_line)
+        # fc_helper.print_obj(obj_linked, pre_line=pre_line)
+        # fc_helper.print_obj(obj_linked.LinkedObject, pre_line=pre_line)
+
+        # we check if we have the needed object already.
+        # if not we just add a new on..
+        base_collection = None
+        if linkedobj_label not in bpy.data.collections:
+            print(pre_line + "create new!")
+            # create new
+            func_data = self.import_obj(
+                obj=obj_linked,
+                collection=func_data["collection"],
+                collection_parent=func_data["collection_parent"],
+                pre_line=pre_line + '    '
+            )
+            # if func_data["bobj"]:
+            #     base_collection = func_data["bobj"]
+            if func_data["collection"]:
+                base_collection = func_data["collection"]
+            print(pre_line + "created object: ", base_collection)
+            if base_collection:
+                # hide this internal object.
+                # we use only the instances..
+                base_collection.hide_render = True
+                base_collection.hide_select = True
+                base_collection.hide_viewport = False
+            func_data["collection"] = func_data["collection_parent"]
+            func_data["collection_parent"] = None
+
+        base_collection = bpy.data.collections[linkedobj_label]
+        if obj_label not in bpy.data.objects:
+            # create a instance of the collection
+            # TODO: check if we can use the collection directly..
+            # base_collection
+            # override = {
+            #     "active_object": bpy.data.collections[
+            #         func_data["collection"].name]
+            # }
+            # override = bpy.context.copy()
+            # override["active_object"] = bpy.data.collections[
+            #     func_data["collection"].name
+            # ]
+            ops_result = bpy.ops.object.collection_instance_add(
+                # override,
+                # name=obj_label,
+                collection=base_collection.name,
+                align='WORLD',
+                location=(0, 0, 0),
+                rotation=(0, 0, 0),
+            )
+            # print(pre_line + "ops_result:", ops_result)
+            result_obj = bpy.data.objects[linkedobj_label]
+            result_obj.name = obj_label
+            print(pre_line + "result_obj", result_obj)
+            result_obj.empty_display_size = 0.01
+            func_data["collection"].objects.link(result_obj)
+            self.config["placement"] = obj.Placement
+            self.handle_placement(result_obj, enable_scale=False)
 
     # ##########################################
     # main object import
@@ -626,6 +738,7 @@ class ImportFcstd(object):
         # dict for storing all data
         func_data = {
             "obj": obj,
+            "bobj": None,
             "verts": [],
             "edges": [],
             "faces": [],
@@ -639,16 +752,8 @@ class ImportFcstd(object):
             "pre_line": pre_line,
         }
         # func_data["matindex"]
-
+        bobj = None
         if obj:
-            # if hasattr(obj, 'ElementList'):
-            #     self.config["report"]({'WARNING'}, (
-            #         pre_line +
-            #         "'{}' ('{}') of type '{}': "
-            #         "Warning: ElementList handling is highly experimental!!"
-            #         "".format(obj.Label, obj.Name, obj.TypeId)
-            #     ))
-            #     self.handle__ObjectWithElementList(func_data)
             if (
                 obj.isDerivedFrom("Part::FeaturePython")
                 and hasattr(obj, 'ExpandArray')
@@ -665,22 +770,16 @@ class ImportFcstd(object):
             #     self.handle__XXXXXX(func_data)
             elif obj.isDerivedFrom("App::Part"):
                 self.handle__AppPart(func_data)
-            # elif obj.isDerivedFrom("App::LinkElement"):
-            #     self.config["report"]({'WARNING'}, (
-            #         pre_line +
-            #         "'{}' ('{}') of type '{}': "
-            #         "Warning: LinkElement handling is highly experimental!!"
-            #         "".format(obj.Label, obj.Name, obj.TypeId)
-            #     ))
-            #     self.handle__AppLinkElement(func_data)
-            # elif obj.isDerivedFrom("App::Link"):
-            #     self.config["report"]({'WARNING'}, (
-            #         pre_line +
-            #         "'{}' ('{}') of type '{}': "
-            #         "Warning: Link handling is highly experimental!!"
-            #         "".format(obj.Label, obj.Name, obj.TypeId)
-            #     ))
-            #     self.handle__AppLink(func_data)
+            elif obj.isDerivedFrom("App::LinkElement"):
+                self.handle__AppLinkElement(func_data)
+            elif obj.isDerivedFrom("App::Link"):
+                self.config["report"]({'WARNING'}, (
+                    pre_line +
+                    "'{}' ('{}') of type '{}': "
+                    "Warning: Link handling is highly experimental!!"
+                    "".format(obj.Label, obj.Name, obj.TypeId)
+                ))
+                self.handle__AppLink(func_data)
             else:
                 self.config["report"]({'WARNING'}, (
                     pre_line +
@@ -694,6 +793,7 @@ class ImportFcstd(object):
                 and (func_data["faces"] or func_data["edges"])
             ):
                 self.add_or_update_blender_obj(func_data)
+        return func_data
 
     def check_visibility_skip(self, obj):
         """Check if obj is visible."""
@@ -836,10 +936,11 @@ class ImportFcstd(object):
                 self.doc = doc
                 self.config["report"]({'INFO'}, "recompute..")
                 self.doc.recompute()
-                self.config["report"]({'INFO'}, "importLinks..")
-                self.doc.importLinks()
-                self.config["report"]({'INFO'}, "recompute..")
-                self.doc.recompute()
+                # self.config["report"]({'INFO'}, "importLinks..")
+                # self.doc.importLinks()
+                # importLinks is currently not reliable..
+                # self.config["report"]({'INFO'}, "recompute..")
+                # self.doc.recompute()
                 self.prepare_collection()
                 self.import_doc_content(doc)
         except Exception as e:

@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-Import Tests
+Import Tests.
 
 this script can be called from commandline or from within blender.
 therefore we need some heavy tricks with the sys.path..
@@ -131,9 +131,15 @@ importlib.reload(import_fcstd)
 #     print("tests done :-)")
 
 
+def freecad_python_console_copy_and_paste():
+    """Copy into FreeCAD python console..."""
+    sys.path.append("/home/stefan/mydata/github/blender/io_import_fcstd")
+    import freecad_helper as fch
+
+
 # ******************************************
 def main_test():
-    "Main Tests."
+    """Run Tests."""
     print("*"*42)
     print("run import_tests")
 
