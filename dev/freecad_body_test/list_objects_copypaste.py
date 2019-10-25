@@ -4,38 +4,11 @@
 """
 List Objects.
 
-Stand-alone / Copy&Paste version
+Copy&Paste this complete script into the FreeCAD Python console!
 """
 
-import sys
-import os
+import FreeCAD
 
-
-def append_freecad_path():
-    """Append the FreeCAD path."""
-    path_to_freecad = "/usr/lib/freecad-daily-python3/lib/FreeCAD.so"
-    if os.path.exists(path_to_freecad):
-        if os.path.isfile(path_to_freecad):
-            path_to_freecad = os.path.dirname(path_to_freecad)
-        print("Configured FreeCAD path:", path_to_freecad)
-        if path_to_freecad not in sys.path:
-            sys.path.append(path_to_freecad)
-    else:
-        print("FreeCAD path is not correct.")
-
-
-try:
-    try:
-        import FreeCAD
-    except ModuleNotFoundError:
-        append_freecad_path()
-    import FreeCAD
-    print("FreeCAD version:", FreeCAD.Version())
-except ModuleNotFoundError as e:
-    print("FreeCAD import failed.", e)
-
-
-# ******************************************
 
 def print_obj_header(
     pre_line="",
@@ -161,28 +134,19 @@ def print_obj_with_label(doc, label):
 #
 # ******************************************
 
-doc = FreeCAD.open(
-    "/home/stefan/mydata/github/blender/"
-    "io_import_fcstd/dev/freecad_linking_example/assembly.FCStd"
-)
+doc = FreeCAD.ActiveDocument
 docname = doc.Name
 
 # ******************************************
-print("~"*42)
 objects = doc.Objects
 print("doc.Objects", len(objects))
 print_objects(objects)
-print("~"*42)
 
-print_obj_with_label(doc, "my_final_assembly")
-print_obj_with_label(doc, "octagon_part")
-print_obj_with_label(doc, "octagon_body")
+# ******************************************
 
-# t1 = doc.getObjectsByLabel("my_final_assembly")
-# t2 = doc.getObjectsByLabel("octagon_part")
-# t3 = doc.getObjectsByLabel("octagon_body")
+print_obj_with_label(doc, "World_Body")
+print_obj_with_label(doc, "Sun_Sphere")
+print_obj_with_label(doc, "Seagull_Body")
 
-
+# ******************************************
 print("tests done :-)")
-
-FreeCAD.closeDocument(docname)
