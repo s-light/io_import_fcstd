@@ -400,6 +400,7 @@ class ImportFcstd(object):
         if self.config['update']:
             if bobj.name not in func_data["collection"].objects:
                 func_data["collection"].objects.link(bobj)
+                bobj.parent = func_data["bobj_parent"]
             else:
                 print(
                     pre_line +
@@ -408,6 +409,7 @@ class ImportFcstd(object):
                 )
         else:
             func_data["collection"].objects.link(bobj)
+            bobj.parent = func_data["bobj_parent"]
         # bpy.context.scene.objects.active = func_data["obj"]
         # obj.select = True
 
@@ -438,10 +440,11 @@ class ImportFcstd(object):
         else:
             # create empty
             temp_empty = bpy.data.objects.new(
-                name="collection_label",
+                name=collection_label,
                 object_data=None
             )
-            temp_collection.children.link(temp_empty)
+            temp_collection.objects.link(temp_empty)
+            temp_empty.parent = func_data["bobj_parent"]
         # update func_data links
         func_data["collection_parent"] = func_data["collection"]
         func_data["collection"] = temp_collection
@@ -475,6 +478,7 @@ class ImportFcstd(object):
                     obj=obj,
                     collection=func_data["collection"],
                     collection_parent=func_data["collection_parent"],
+                    bobj_parent=func_data["bobj_parent"],
                     pre_line=pre_line + '    '
                 )
         else:
@@ -685,6 +689,8 @@ class ImportFcstd(object):
             flag_new = True
             result_bobj.empty_display_size = 0.01
             func_data["collection"].objects.link(result_bobj)
+            # result_bobj.parent = func_data["bobj_parent"]
+            result_bobj.parent = obj_parent
             bpy.context.scene.collection.objects.unlink(result_bobj)
 
         if self.config["update"] or flag_new:
@@ -727,6 +733,7 @@ class ImportFcstd(object):
                 obj=obj_linked,
                 collection=func_data["collection"],
                 collection_parent=func_data["collection_parent"],
+                bobj_parent=func_data["bobj_parent"],
                 pre_line=pre_line + '    '
             )
             # if func_data["bobj"]:
@@ -941,6 +948,7 @@ class ImportFcstd(object):
 
     def load_guidata(self):
         """Check if we have a GUI document."""
+        self.config["report"]({'INFO'}, "load guidata..")
         zdoc = zipfile.ZipFile(self.config["filename"])
         if zdoc:
             if "GuiDocument.xml" in zdoc.namelist():
@@ -967,6 +975,7 @@ class ImportFcstd(object):
                         self.guidata[key]["DiffuseColor"] = cols
             zdoc.close()
         # print ("self.guidata:",self.guidata)
+        self.config["report"]({'INFO'}, "load guidata done.")
 
     def prepare_freecad_import(self):
         """Prepare FreeCAD import."""
@@ -1024,6 +1033,11 @@ class ImportFcstd(object):
                 )
                 return {'CANCELLED'}
             else:
+                self.config["report"](
+                    {'INFO'},
+                    "File Opend. '{}'"
+                    "".format(self.config["filename"])
+                )
                 self.doc = doc
                 self.config["report"]({'INFO'}, "recompute..")
                 self.doc.recompute()

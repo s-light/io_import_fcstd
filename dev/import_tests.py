@@ -133,7 +133,8 @@ importlib.reload(import_fcstd)
 
 def freecad_python_console_copy_and_paste():
     """Copy into FreeCAD python console..."""
-    sys.path.append("/home/stefan/mydata/github/blender/io_import_fcstd")
+    # sys.path.append("/home/stefan/mydata/github/blender/io_import_fcstd")
+    sys.path.append(outside_package_dir)
     import freecad_helper as fch
 
 
@@ -144,9 +145,13 @@ def main_test():
     print("run import_tests")
 
     # filename_relative = "./dev/freecad_linking_example/assembly.FCStd"
-    filename_relative = "./dev/freecad_linking_example/assembly__export.FCStd"
+    # filename_relative = "./dev/freecad_linking_example/assembly__export.FCStd"
+    # filename_relative = "./BodyTest.FCStd"
+    filename_relative = "./MyLittleWorld.FCStd"
     print("FreeCAD document:", filename_relative)
-    filename = os.path.join(base_dir, filename_relative)
+    # filename = os.path.join(base_dir, filename_relative)
+    filename = os.path.join(script_dir, filename_relative)
+    filename = os.path.realpath(filename)
 
     my_importer = import_fcstd.ImportFcstd(
         # update=self.option_update,
