@@ -99,6 +99,8 @@ print("from io_import_fcstd import import_fcstd")
 # pylama:ignore=E402
 from io_import_fcstd import import_fcstd
 importlib.reload(import_fcstd)
+importlib.reload(import_fcstd.fc_helper)
+importlib.reload(import_fcstd.b_helper)
 
 # ******************************************
 #
@@ -135,7 +137,7 @@ def freecad_python_console_copy_and_paste():
     """Copy into FreeCAD python console..."""
     # sys.path.append("/home/stefan/mydata/github/blender/io_import_fcstd")
     sys.path.append(outside_package_dir)
-    import freecad_helper as fch
+    import freecad_helper as fch  # noqa
 
 
 # ******************************************
@@ -144,14 +146,21 @@ def main_test():
     print("*"*42)
     print("run import_tests")
 
-    # filename_relative = "./dev/freecad_linking_example/assembly.FCStd"
-    # filename_relative = "./dev/freecad_linking_example/assembly__export.FCStd"
-    # filename_relative = "./BodyTest.FCStd"
-    filename_relative = "./MyLittleWorld.FCStd"
-    print("FreeCAD document:", filename_relative)
-    # filename = os.path.join(base_dir, filename_relative)
-    filename = os.path.join(script_dir, filename_relative)
+    # get open document name
+    doc_filename = os.path.splitext(os.path.basename(bpy.data.filepath))
+    if doc_filename[1].endswith("blend"):
+        doc_filename = doc_filename[0]
+        doc_filename += ".FCStd"
+        filename = os.path.join(".", doc_filename)
+        filename = os.path.join(script_dir, filename)
+    else:
+        # fallback
+        # filename = "./dev/freecad_linking_example/assembly.FCStd"
+        filename = "./dev/freecad_linking_example/assembly__export.FCStd"
+        filename = os.path.join(base_dir, filename)
+
     filename = os.path.realpath(filename)
+    print("FreeCAD document to import:", filename)
 
     my_importer = import_fcstd.ImportFcstd(
         # update=self.option_update,
