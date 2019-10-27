@@ -50,10 +50,19 @@ def print_obj(
     end="\n",
 ):
     """Print object nicely formated."""
+    obj_label = "NONE"
+    if obj:
+        obj_label = obj.Label
+    obj_name = "NONE"
+    if obj:
+        obj_name = obj.Name
+    obj_type = "NONE"
+    if obj:
+        obj_type = obj.TypeId
     print(
         pre_line +
         "{:<25} {:<15} {:<25}"
-        "".format(obj.Label, obj.Name, obj.TypeId),
+        "".format(obj_label, obj_name, obj_type),
         end=''
     )
     if show_lists:

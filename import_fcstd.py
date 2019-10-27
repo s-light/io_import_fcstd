@@ -151,13 +151,19 @@ class ImportFcstd(object):
         """Get object label with optional prefix."""
         label = None
         if hasattr(obj, "LinkedObject"):
+            obj_linked_label = "NONE"
+            if obj.LinkedObject:
+                obj_linked_label = obj.LinkedObject.Label
             label = (
-                obj.LinkedObject.Label
+                obj_linked_label
                 + "__"
                 + obj.Label
             )
         else:
-            label = obj.Label
+            obj_label = "NONE"
+            if obj:
+                obj_label = obj.Label
+            label = obj_label
         if label:
             self.config["obj_name_prefix"] + label
         return label
@@ -166,9 +172,12 @@ class ImportFcstd(object):
         """Get linkedobject label with optional prefix."""
         label = None
         if hasattr(obj, "LinkedObject"):
+            obj_linked_label = "NONE"
+            if obj.LinkedObject:
+                obj_linked_label = obj.LinkedObject.Label
             label = (
                 self.config["obj_name_prefix"]
-                + obj.LinkedObject.Label
+                + obj_linked_label
             )
         return label
 
@@ -675,40 +684,50 @@ class ImportFcstd(object):
     ):
         """Add or update collection instance object."""
         pre_line = func_data["pre_line"]
-        base_collection = bpy.data.collections[linkedobj_label]
-        flag_new = False
-        if obj_label not in bpy.data.objects:
-            # create a instance of the collection
-            result_bobj = bpy.data.objects.new(
-                name=obj_label,
-                object_data=None
-            )
-            result_bobj.instance_collection = base_collection
-            result_bobj.instance_type = 'COLLECTION'
-            print(pre_line + "result_bobj", result_bobj)
-            flag_new = True
-            result_bobj.empty_display_size = 0.01
-            func_data["collection"].objects.link(result_bobj)
-            # result_bobj.parent = func_data["bobj_parent"]
-            result_bobj.parent = obj_parent
-            bpy.context.scene.collection.objects.unlink(result_bobj)
+        base_collection = None
+        if linkedobj_label in bpy.data.collections:
+            base_collection = bpy.data.collections[linkedobj_label]
+            flag_new = False
+            if obj_label not in bpy.data.objects:
+                # create a instance of the collection
+                result_bobj = bpy.data.objects.new(
+                    name=obj_label,
+                    object_data=None
+                )
+                result_bobj.instance_collection = base_collection
+                result_bobj.instance_type = 'COLLECTION'
+                print(pre_line + "result_bobj", result_bobj)
+                flag_new = True
+                result_bobj.empty_display_size = 0.01
+                func_data["collection"].objects.link(result_bobj)
+                # result_bobj.parent = func_data["bobj_parent"]
+                result_bobj.parent = obj_parent
+                bpy.context.scene.collection.objects.unlink(result_bobj)
 
-        if self.config["update"] or flag_new:
-            bobj = bpy.data.objects[obj_label]
-            # print(pre_line + "bobj.location", str(bobj.location))
-            self.handle_placement(obj, bobj, enable_scale=False)
-            # print(pre_line + "bobj.location", bobj.location)
-            # print(
-            #     pre_line + "obj_parent.Placement.Base",
-            #     obj_parent.Placement.Base
-            # )
-            self.handle_placement(
-                obj_parent,
-                bobj,
-                enable_scale=False,
-                relative=True
-            )
-            # print(pre_line + "bobj.location", bobj.location)
+            if self.config["update"] or flag_new:
+                bobj = bpy.data.objects[obj_label]
+                # print(pre_line + "bobj.location", str(bobj.location))
+                self.handle_placement(obj, bobj, enable_scale=False)
+                # print(pre_line + "bobj.location", bobj.location)
+                # print(
+                #     pre_line + "obj_parent.Placement.Base",
+                #     obj_parent.Placement.Base
+                # )
+                self.handle_placement(
+                    obj_parent,
+                    bobj,
+                    enable_scale=False,
+                    relative=True
+                )
+                # print(pre_line + "bobj.location", bobj.location)
+            else:
+                self.config["report"]({'WARNING'}, (
+                    pre_line +
+                    "Warning: can't add or update instance. "
+                    "'{}' collection not found."
+                    "".format(linkedobj_label)
+                ))
+                return False
 
     def add_or_update_link_target(
         self,
@@ -755,6 +774,7 @@ class ImportFcstd(object):
         pre_line = func_data["pre_line"]
         obj = func_data["obj"]
         obj_linked = func_data["obj"].LinkedObject
+        print("handle__AppLink: obj", obj)
         self.config["report"]({'WARNING'}, (
             pre_line +
             "'{}' ('{}') of type '{}': "
@@ -838,7 +858,7 @@ class ImportFcstd(object):
         # After "import FreeCAD" these modules become available
         # import Part
         # import PartDesign
-
+        # print("import_obj: obj", obj)
         # dict for storing all data
         func_data = {
             "obj": obj,
