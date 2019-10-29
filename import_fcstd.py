@@ -1087,7 +1087,9 @@ class ImportFcstd(object):
             print("Configured FreeCAD path:", path)
             sys.path.append(path)
         else:
-            print("FreeCAD path is not configured in preferences")
+            self.config["report"]({'WARNING'}, (
+                "FreeCAD path is not configured in preferences."
+            ))
 
     def import_fcstd(self, filename=None):
         """Read a FreeCAD .FCStd file and creates Blender objects."""
@@ -1102,11 +1104,12 @@ class ImportFcstd(object):
                 {'ERROR'},
                 "Unable to import the FreeCAD Python module. \n"
                 "\n"
-                "Make sure it is installed on your system"
+                "Make sure it is installed on your system \n"
                 "and compiled with Python3 (same version as Blender).\n"
-                "It must also be found by Python, "
-                "you might need to set its path in this Addon preferences"
+                "It must also be found by Python, \n"
+                "you might need to set its path in this Addon preferences "
                 "(User preferences->Addons->expand this addon).\n"
+                "\n"
                 + str(e)
             )
             return {'CANCELLED'}

@@ -7,13 +7,16 @@ from . import import_fcstd
 bl_info = {
     "name": "FreeCAD Importer",
     "category": "Import-Export",
-    "author": "Yorik van Havre",
-    "version": (6, 0, 0),
+    "author": "Yorik van Havre; Stefan Krüger",
+    "version": (6, 1, 0),
     "blender": (2, 80, 0),
     "location": "File > Import > FreeCAD",
     "description": "Imports a .FCStd file from FreeCAD",
-    "warning": "This addon needs FreeCAD installed on your system. \
-    Only Part- and Mesh-based objects supported at the moment.",
+    "warning": (
+        "This addon needs FreeCAD installed on your system.  "
+        "Only Part- and Mesh-based objects supported at the moment.  "
+        "It is currently in an Experimental State.."
+    ),
 }
 
 # brut force path loading:
@@ -32,11 +35,35 @@ bl_info = {
 # Blender Operator class
 # ==============================================================================
 
+# https://docs.blender.org/api/current/bpy.types.AddonPreferences.html#module-bpy.types
+
+class IMPORT_OT_FreeCAD_Preferences(bpy.types.AddonPreferences):
+    """A preferences settings dialog to set the path to the FreeCAD module."""
+    # this must match the add-on name, use '__package__'
+    # when defining this in a submodule of a python package.
+    # bl_idname = __name__
+    bl_idname = __package__
+
+    filepath: bpy.props.StringProperty(
+        name="Path to FreeCAD.so (Mac/Linux) or FreeCAD.pyd (Windows)",
+        subtype='FILE_PATH',
+    )
+
+    def draw(self, context):
+        """Draw Preferences."""
+        layout = self.layout
+        layout.label(text=(
+            "FreeCAD must be installed on your system, and its path set below."
+            " Make sure both FreeCAD and Blender use the same Python version "
+            "(check their Python console)"
+        ))
+        layout.prop(self, "filepath")
+
 
 class IMPORT_OT_FreeCAD(bpy.types.Operator):
     """Imports the contents of a FreeCAD .FCStd file."""
 
-    bl_idname = 'import_fcstd.import_freecad'
+    bl_idname = 'io_import_fcstd.import_freecad'
     bl_label = 'Import FreeCAD FCStd file'
     bl_options = {'REGISTER', 'UNDO'}
 
@@ -121,27 +148,6 @@ class IMPORT_OT_FreeCAD(bpy.types.Operator):
                 )
                 return my_importer.import_fcstd(filename=dir+filestr)
         return {'FINISHED'}
-
-
-class IMPORT_OT_FreeCAD_Preferences(bpy.types.AddonPreferences):
-    """A preferences settings dialog to set the path to the FreeCAD module."""
-
-    bl_idname = __name__
-
-    filepath: bpy.props.StringProperty(
-            name="Path to FreeCAD.so (Mac/Linux) or FreeCAD.pyd (Windows)",
-            subtype='FILE_PATH',
-            )
-
-    def draw(self, context):
-        """Draw Preferences."""
-        layout = self.layout
-        layout.label(text=(
-            "FreeCAD must be installed on your system, and its path set below."
-            " Make sure both FreeCAD and Blender use the same Python version "
-            "(check their Python console)"
-        ))
-        layout.prop(self, "filepath")
 
 
 # ==============================================================================
