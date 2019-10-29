@@ -96,6 +96,7 @@ class ImportFcstd(object):
         sharemats=True,
         update_materials=False,
         obj_name_prefix="",
+        path_to_freecad=None,
         report=None
     ):
         """Init."""
@@ -113,6 +114,7 @@ class ImportFcstd(object):
             "obj_name_prefix": obj_name_prefix,
             "report": self.print_report,
         }
+        self.path_to_freecad = path_to_freecad
         self.report = report
 
         print('config', self.config)
@@ -1078,9 +1080,7 @@ class ImportFcstd(object):
     def prepare_freecad_import(self):
         """Prepare FreeCAD import."""
         # append the FreeCAD path specified in addon preferences
-        user_preferences = bpy.context.preferences
-        addon_prefs = user_preferences.addons["io_import_fcstd"].preferences
-        path = addon_prefs.filepath
+        path = self.path_to_freecad
         if path:
             if os.path.isfile(path):
                 path = os.path.dirname(path)

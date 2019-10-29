@@ -8,7 +8,7 @@ bl_info = {
     "name": "FreeCAD Importer",
     "category": "Import-Export",
     "author": "Yorik van Havre; Stefan Krüger",
-    "version": (6, 1, 0),
+    "version": (6, 1, 1),
     "blender": (2, 80, 0),
     "location": "File > Import > FreeCAD",
     "description": "Imports a .FCStd file from FreeCAD",
@@ -45,8 +45,15 @@ class IMPORT_OT_FreeCAD_Preferences(bpy.types.AddonPreferences):
     bl_idname = __package__
 
     filepath: bpy.props.StringProperty(
-        name="Path to FreeCAD.so (Mac/Linux) or FreeCAD.pyd (Windows)",
         subtype='FILE_PATH',
+        name="Path to FreeCAD lib",
+        description=(
+            "Path to \n"
+            "FreeCAD.so (Mac/Linux) \n"
+            "or \n"
+            "FreeCAD.pyd (Windows)"
+        ),
+        default="/usr/lib/freecad-daily-python3/lib/FreeCAD.so",
     )
 
     def draw(self, context):
@@ -69,6 +76,13 @@ class IMPORT_OT_FreeCAD(bpy.types.Operator):
 
     # ImportHelper mixin class uses this
     filename_ext = ".fcstd"
+
+    # https://blender.stackexchange.com/a/7891/16634
+    # see Text -> Templates -> Python -> Operator File Export
+    filter_glob: bpy.props.StringProperty(
+        default="*.FCStd; *.fcstd",
+        options={'HIDDEN'},
+    )
 
     # Properties assigned by the file selection window.
 
@@ -130,8 +144,23 @@ class IMPORT_OT_FreeCAD(bpy.types.Operator):
         context.window_manager.fileselect_add(self)
         return {'RUNNING_MODAL'}
 
+    def get_preferences(self):
+        """Get addon preferences."""
+        user_preferences = bpy.context.preferences
+        addon_prefs = user_preferences.addons["io_import_fcstd"].preferences
+        return addon_prefs
+
+    def get_freecad_path(self):
+        """Get FreeCAD path from addon preferences."""
+        # get the FreeCAD path specified in addon preferences
+        addon_prefs = self.get_preferences()
+        path_to_freecad = addon_prefs.filepath
+        print("addon_prefs path_to_freecad", path_to_freecad)
+        return path_to_freecad
+
     def execute(self, context):
         """Call when the user is done using the modal file-select window."""
+        path_to_freecad = self.get_freecad_path()
         dir = self.directory
         for file in self.files:
             filestr = str(file.name)
@@ -144,7 +173,8 @@ class IMPORT_OT_FreeCAD(bpy.types.Operator):
                     filter_sketch=self.option_filter_sketch,
                     scale=self.option_scale,
                     sharemats=self.option_sharemats,
-                    report=self.report
+                    report=self.report,
+                    path_to_freecad=path_to_freecad
                 )
                 return my_importer.import_fcstd(filename=dir+filestr)
         return {'FINISHED'}
