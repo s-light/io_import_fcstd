@@ -43,7 +43,6 @@ def open_file(filename):
 if __name__ == '__main__':
     "Main Tests."
     print("*"*42)
-    filename = "./TestParentChildPositions_NoLinks.FCStd"
-    filename = "./TestParentChildPositions.FCStd"
+    filename = "./Test_DraftLinkedArray.FCStd"
     open_file(filename)
     print("*"*42)

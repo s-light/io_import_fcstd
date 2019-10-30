@@ -13,8 +13,7 @@ import FreeCAD
 
 print("FreeCAD version:", FreeCAD.Version())
 print("*"*42)
-# doc = FreeCAD.open("./TestParentChildPositions_NoLinks.FCStd")
-doc = FreeCAD.open("./TestParentChildPositions.FCStd")
+doc = FreeCAD.open("./Test_DraftLinkedArray.FCStd")
 
 
 print("file contains {} objects.".format(len(doc.Objects)))
