@@ -70,14 +70,20 @@ def append_freecad_path():
     if os.path.exists(path_to_freecad):
         if os.path.isfile(path_to_freecad):
             path_to_freecad = os.path.dirname(path_to_freecad)
-        print("Configured FreeCAD path:", path_to_freecad)
+        print("Configured path to FreeCAD:", path_to_freecad)
         if path_to_freecad not in sys.path:
             sys.path.append(path_to_freecad)
     else:
         if bpy:
-            print("FreeCAD path is not configured in preferences correctly.", path_to_freecad)
+            print(
+                "FreeCAD path is not configured in preferences correctly. "
+                "'{}'".format(path_to_freecad)
+            )
         else:
-            print("FreeCAD path is not correct.")
+            print(
+                "Path to FreeCAD does not exist. Please check! "
+                "'{}'".format(path_to_freecad)
+            )
 
 
 try:
@@ -170,7 +176,8 @@ def main_test():
         # filter_sketch=self.option_filter_sketch,
         # scale=self.option_scale,
         # sharemats=self.option_sharemats,
-        # report=self.report
+        path_to_freecad=path_to_freecad,
+        # report=self.report,
     )
     my_importer.import_fcstd(filename=filename)
 
