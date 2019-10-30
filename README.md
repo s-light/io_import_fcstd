@@ -15,6 +15,17 @@ might be supported at this point.
 The development of this addon happens on the FreeCAD forum at  
 [FreeCAD .FCStd importer for Blender 2.80](https://forum.freecadweb.org/viewtopic.php?f=22&t=39778)
 
+# download
+if you feel comfortable with git clone the repro ;-)
+
+otherwise you can use the download button  -
+after download please rename
+`io_import_fcstd-master.zip`
+to
+`io_import_fcstd.zip`
+
+(otherwise currently there is an error with the preference settings.. see #9)
+
 # warning
 
 this is currently only tested with 0.19 / daily-builds on linux 64bit.
