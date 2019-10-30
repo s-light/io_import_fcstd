@@ -151,10 +151,13 @@ def main_test():
     # so we use the classic try finally block:
     docname = ""
     try:
-        filename_relative = "./dev/freecad_linking_example/assembly.FCStd"
+        # filename_relative = "./dev/freecad_linking_example/assembly.FCStd"
+        filename_relative = "./dev/freecad_test_ParentChildPositions/TestParentChildPositions.FCStd"
         print("FreeCAD document:", filename_relative)
         filename = os.path.join(base_dir, filename_relative)
+        print("open file..")
         doc = FreeCAD.open(filename)
+        print("file is opened")
         docname = doc.Name
         if not doc:
             print("Unable to open the given FreeCAD file")

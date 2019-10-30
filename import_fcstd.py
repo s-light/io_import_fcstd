@@ -1123,7 +1123,15 @@ class ImportFcstd(object):
         try:
             # doc = FreeCAD.open(
             #     "/home/stefan/mydata/freecad/tests/linking_test/Linking.FCStd")
-            doc = FreeCAD.open(self.config["filename"])
+            self.config["report"](
+                {'INFO'},
+                "open FreeCAD file. '{}'"
+                "".format(self.config["filename"])
+            )
+            try:
+                doc = FreeCAD.open(self.config["filename"])
+            except Exception as e:
+                print(e)
             docname = doc.Name
             self.doc_filename = docname + ".FCStd"
             if not doc:

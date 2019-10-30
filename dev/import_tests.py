@@ -75,7 +75,7 @@ def append_freecad_path():
             sys.path.append(path_to_freecad)
     else:
         if bpy:
-            print("FreeCAD path is not configured in preferences correctly.")
+            print("FreeCAD path is not configured in preferences correctly.", path_to_freecad)
         else:
             print("FreeCAD path is not correct.")
 
