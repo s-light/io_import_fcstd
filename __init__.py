@@ -2,6 +2,11 @@
 
 import bpy
 
+# ImportHelper is a helper class, defines filename and
+# invoke() function which calls the file selector.
+# from bpy_extras.io_utils import ImportHelper
+# not sure what this brings us...
+
 from . import import_fcstd
 
 bl_info = {
@@ -67,6 +72,7 @@ class IMPORT_OT_FreeCAD_Preferences(bpy.types.AddonPreferences):
         layout.prop(self, "filepath")
 
 
+# class IMPORT_OT_FreeCAD(bpy.types.Operator, ImportHelper):
 class IMPORT_OT_FreeCAD(bpy.types.Operator):
     """Imports the contents of a FreeCAD .FCStd file."""
 
@@ -85,7 +91,6 @@ class IMPORT_OT_FreeCAD(bpy.types.Operator):
     )
 
     # Properties assigned by the file selection window.
-
     directory: bpy.props.StringProperty(
         maxlen=1024,
         subtype='FILE_PATH',
@@ -95,6 +100,8 @@ class IMPORT_OT_FreeCAD(bpy.types.Operator):
         type=bpy.types.OperatorFileListElement,
         options={'HIDDEN', 'SKIP_SAVE'}
     )
+
+    # user import options
     option_skiphidden: bpy.props.BoolProperty(
         name="Skip hidden objects",
         default=True,
@@ -138,6 +145,14 @@ class IMPORT_OT_FreeCAD(bpy.types.Operator):
             "Objects with same color/transparency will use the same material"
         )
     )
+    # option_create_tree: bpy.props.BoolProperty(
+    #     name="Recreate FreeCAD Object-Tree",
+    #     default=True,
+    #     description=(
+    #         "Try to recreate the same parent-child relationships "
+    #         "as in the FreeCAD Object-Tree."
+    #     )
+    # )
 
     def invoke(self, context, event):
         """Invoke is called when the user picks our Import menu entry."""
