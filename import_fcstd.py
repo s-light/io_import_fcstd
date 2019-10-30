@@ -174,23 +174,13 @@ class ImportFcstd(object):
             )
         return label
 
-    def get_obj_combined_label(self, obj):
+    def get_obj_combined_label(self, parent_obj, obj):
         """Get object label with optional prefix."""
-        label = None
-        if hasattr(obj, "LinkedObject"):
-            obj_linked_label = "NONE"
-            if obj.LinkedObject:
-                obj_linked_label = obj.LinkedObject.Label
-            label = (
-                obj_linked_label
-                + "__"
-                + obj.Label
-            )
-        else:
-            obj_label = "NONE"
-            if obj:
-                obj_label = obj.Label
-            label = obj_label
+        label = (
+            parent_obj.Label
+            + "__"
+            + obj.Label
+        )
         if label:
             self.config["obj_name_prefix"] + label
         return label
@@ -341,7 +331,13 @@ class ImportFcstd(object):
                 return True
         return False
 
-    def handle_placement(self, obj, bobj, enable_scale=True, relative=False):
+    def handle_placement(
+        self,
+        obj,
+        bobj,
+        enable_scale=True,
+        relative=False
+    ):
         """Handle placement."""
         if self.config["placement"]:
             # print ("placement:",placement)
@@ -464,6 +460,27 @@ class ImportFcstd(object):
         func_data["collection_parent"] = func_data["collection"]
         func_data["collection"] = temp_collection
 
+    def set_obj_parent_and_collection(self, pre_line, func_data, bobj):
+        """Set Object parent and collection."""
+        bobj.parent = func_data["bobj_parent"]
+        print(
+            pre_line +
+            "'{}' set parent to '{}' "
+            "".format(bobj, func_data["bobj_parent"])
+        )
+
+        # add object to current collection
+        collection = func_data["collection"]
+        if not collection:
+            collection = self.fcstd_collection
+        if bobj.name not in collection.objects:
+            collection.objects.link(bobj)
+            print(
+                pre_line +
+                "'{}' add to '{}' "
+                "".format(bobj, collection)
+            )
+
     def parent_empty_add_or_update(self, func_data, parent_label):
         """Parent Empty handle add or update."""
         print(
@@ -472,6 +489,8 @@ class ImportFcstd(object):
         )
         pre_line = func_data["pre_line"] + " → "
         parent_empty = None
+
+        obj = func_data["obj"]
 
         if parent_label in bpy.data.objects:
             print(
@@ -500,33 +519,27 @@ class ImportFcstd(object):
                 name=parent_label,
                 object_data=None
             )
-            parent_empty.parent = func_data["bobj_parent"]
-            print(
-                pre_line +
-                "'{}' set parent to '{}' "
-                "".format(parent_empty, func_data["bobj_parent"])
-            )
-
-            # add object to current collection
-            func_data["collection"].objects.link(parent_empty)
-            print(
-                pre_line +
-                "'{}' add to '{}' "
-                "".format(parent_empty, func_data["collection"])
-            )
+            self.set_obj_parent_and_collection(
+                pre_line, func_data, parent_empty)
 
         if self.config["update"] or flag_new:
             # set position of empty
-            # TODO
-            print(
-                pre_line +
-                "'{}' set position"
-                "".format(parent_empty)
-                # "'{}' set position to '{}'"
-                # "".format(parent_empty, position)
-            )
+            if obj:
+                self.handle_placement(
+                    obj,
+                    parent_empty,
+                    enable_scale=False,
+                )
+                print(
+                    pre_line +
+                    "'{}' set position"
+                    "".format(parent_empty)
+                    # "'{}' set position to '{}'"
+                    # "".format(parent_empty, position)
+                )
 
         # update func_data links
+        func_data["obj_parent"] = obj
         func_data["bobj_parent"] = parent_empty
         return parent_empty
 
@@ -588,6 +601,7 @@ class ImportFcstd(object):
                     obj=obj,
                     collection=func_data["collection"],
                     collection_parent=func_data["collection_parent"],
+                    obj_parent=func_data["obj_parent"],
                     bobj_parent=func_data["bobj_parent"],
                     pre_line=pre_line + '    '
                 )
@@ -664,22 +678,46 @@ class ImportFcstd(object):
     ):
         """Add or update collection instance object."""
         pre_line = func_data["pre_line"]
+        print(
+            pre_line +
+            "add_or_update_collection_instance '{}'"
+            "".format(obj_label)
+        )
+        pre_line = pre_line + ">  "
+        print(pre_line + "obj_label '{}'".format(obj_label))
+        print(pre_line + "linkedobj_label '{}'".format(linkedobj_label))
+        print(
+            pre_line +
+            "func_data[collection] '{}'"
+            "".format(func_data["collection"])
+        )
+
         base_collection = None
+        bobj = None
         if linkedobj_label in bpy.data.collections:
             base_collection = bpy.data.collections[linkedobj_label]
             flag_new = False
-            if obj_label not in bpy.data.objects:
+            if obj_label in bpy.data.objects:
+                bobj = bpy.data.objects[obj_label]
+            else:
                 # create a instance of the collection
-                result_bobj = self.create_collection_instance(
+                bobj = self.create_collection_instance(
                     func_data,
                     obj_label,
                     base_collection
                 )
                 flag_new = True
-                print(pre_line + "result_bobj", result_bobj)
+                # print(pre_line + "bobj", bobj)
+            print(
+                pre_line +
+                "bobj '{}'; new:{}"
+                "".format(bobj, flag_new)
+            )
 
             if self.config["update"] or flag_new:
-                bobj = bpy.data.objects[obj_label]
+                self.set_obj_parent_and_collection(
+                    pre_line, func_data, bobj)
+
                 # print(pre_line + "bobj.location", str(bobj.location))
                 self.handle_placement(obj, bobj, enable_scale=False)
                 # print(pre_line + "bobj.location", bobj.location)
@@ -792,12 +830,12 @@ class ImportFcstd(object):
             "".format(obj.Label, obj.Name, obj.TypeId)
         ))
         obj_label = self.get_obj_label(obj)
-        obj_linkedobj_label = self.get_obj_linkedobj_label(obj)
-        obj_linked_label = self.get_obj_label(obj_linkedobj)
+        # obj_linkedobj_label = self.get_obj_linkedobj_label(obj)
+        # obj_linked_label = self.get_obj_label(obj_linkedobj)
 
         print(pre_line + "obj_label:", obj_label)
-        print(pre_line + "obj_linkedobj_label:", obj_linkedobj_label)
-        print(pre_line + "obj_linked_label:", obj_linked_label)
+        # print(pre_line + "obj_linkedobj_label:", obj_linkedobj_label)
+        # print(pre_line + "obj_linked_label:", obj_linked_label)
         fc_helper.print_obj(
             obj,
             pre_line=pre_line + "obj          : ")
@@ -836,7 +874,8 @@ class ImportFcstd(object):
             # if we have Arrays they  have a intermediet link object..
             # we skip this..
             obj_linkedobj = obj_linkedobj.LinkedObject
-        obj_parent = obj.InList[0]
+        # obj_parent = obj.InList[0]
+        obj_parent = func_data["obj_parent"]
         # self.config["report"]({'ERROR'}, (
         #     pre_line +
         #     "'{}' ('{}') of type '{}': "
@@ -844,14 +883,17 @@ class ImportFcstd(object):
         #     "".format(obj.Label, obj.Name, obj.TypeId)
         # ))
 
-        obj_label = self.get_obj_combined_label(obj)
+        obj_parent_label = self.get_obj_label(obj_parent)
+        obj_label = self.get_obj_combined_label(obj_parent, obj)
         obj_linkedobj_label = self.get_obj_linkedobj_label(obj)
-        # obj_linked_label = self.get_obj_label(obj_linked)
 
         # print(pre_line + "collection:", func_data["collection"])
+        print(pre_line + "obj_parent_label:", obj_parent_label)
         print(pre_line + "obj_label:", obj_label)
         print(pre_line + "obj_linkedobj_label:", obj_linkedobj_label)
-        # print(pre_line + "obj_linked_label:", obj_linked_label)
+        fc_helper.print_obj(
+            obj_parent,
+            pre_line=pre_line + "obj_parent   : ")
         fc_helper.print_obj(
             obj,
             pre_line=pre_line + "obj          : ")
@@ -1005,6 +1047,7 @@ class ImportFcstd(object):
         obj=None,
         collection=None,
         collection_parent=None,
+        obj_parent=None,
         bobj_parent=None,
         pre_line=""
     ):
@@ -1028,6 +1071,7 @@ class ImportFcstd(object):
             # name: "Unnamed",
             "collection": collection,
             "collection_parent": collection_parent,
+            "obj_parent": obj_parent,
             "bobj_parent": bobj_parent,
             "pre_line": pre_line,
         }
@@ -1089,7 +1133,7 @@ class ImportFcstd(object):
         print("-"*21)
 
         self.config["report"]({'INFO'}, (
-            "found {} objects in '{}'"
+            "found {} root objects in '{}'"
             "".format(len(obj_list), self.doc_filename)
         ))
         fc_helper.print_objects(
@@ -1125,6 +1169,8 @@ class ImportFcstd(object):
     def prepare_root_empty(self):
         """Prepare import file root empty."""
         func_data = {
+            "obj": None,
+            "obj_parent": None,
             "bobj_parent": None,
             "collection": self.fcstd_collection,
             "pre_line": "",
@@ -1225,18 +1271,11 @@ class ImportFcstd(object):
                 print(e)
             docname = doc.Name
             self.doc_filename = docname + ".FCStd"
-            if not doc:
-                self.config["report"](
-                    {'ERROR'},
-                    "Unable to open the given FreeCAD file '{}'"
-                    "".format(self.config["filename"])
-                )
-                return {'CANCELLED'}
-            else:
+            if doc:
                 self.config["report"](
                     {'INFO'},
-                    "File Opend. '{}'"
-                    "".format(self.config["filename"])
+                    "File '{}' successfully opened."
+                    "".format(self.doc_filename)
                 )
                 self.doc = doc
                 self.config["report"]({'INFO'}, "recompute..")
@@ -1249,6 +1288,13 @@ class ImportFcstd(object):
                 self.prepare_collection()
                 self.prepare_root_empty()
                 self.import_doc_content(doc)
+            else:
+                self.config["report"](
+                    {'ERROR'},
+                    "Unable to open the given FreeCAD file '{}'"
+                    "".format(self.config["filename"])
+                )
+                return {'CANCELLED'}
         except Exception as e:
             self.config["report"]({'ERROR'}, str(e))
             raise e
