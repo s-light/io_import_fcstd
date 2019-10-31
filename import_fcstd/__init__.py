@@ -161,7 +161,8 @@ class ImportFcstd(object):
         obj,
         bobj,
         enable_scale=True,
-        relative=False
+        relative=False,
+        negative=False,
     ):
         """Handle placement."""
         if self.config["placement"]:
@@ -182,9 +183,14 @@ class ImportFcstd(object):
                 #         bobj.location.x + new_loc.x
                 #     )
                 # )
-                bobj.location.x = bobj.location.x + new_loc.x
-                bobj.location.y = bobj.location.y + new_loc.y
-                bobj.location.z = bobj.location.z + new_loc.z
+                if negative:
+                    bobj.location.x = bobj.location.x - new_loc.x
+                    bobj.location.y = bobj.location.y - new_loc.y
+                    bobj.location.z = bobj.location.z - new_loc.z
+                else:
+                    bobj.location.x = bobj.location.x + new_loc.x
+                    bobj.location.y = bobj.location.y + new_loc.y
+                    bobj.location.z = bobj.location.z + new_loc.z
             else:
                 bobj.location = new_loc
             m = bobj.rotation_mode
@@ -576,6 +582,7 @@ class ImportFcstd(object):
         obj,
         obj_label,
         obj_parent,
+        obj_linkedobj,
         linkedobj_label,
     ):
         """Add or update collection instance object."""
@@ -617,23 +624,45 @@ class ImportFcstd(object):
             )
 
             if self.config["update"] or flag_new:
+                print(
+                    pre_line +
+                    "update '{}' or flag_new '{}'"
+                    "".format(self.config["update"], flag_new)
+                )
                 self.set_obj_parent_and_collection(
                     pre_line, func_data, bobj)
 
-                # print(pre_line + "bobj.location", str(bobj.location))
+                print(pre_line + "handle positioning:")
+                print(
+                    pre_line + "    "
+                    "obj  '{}' ".format(obj.Placement.Base)
+                )
+                print(
+                    pre_line + "    "
+                    "bobj '{}' ".format(bobj.location)
+                )
+                print(pre_line + " -- " "apply obj:")
                 self.handle_placement(obj, bobj, enable_scale=False)
-                # print(pre_line + "bobj.location", bobj.location)
-                # print(
-                #     pre_line + "obj_parent.Placement.Base",
-                #     obj_parent.Placement.Base
-                # )
+                print(
+                    pre_line + "    "
+                    "bobj '{}' ".format(bobj.location)
+                )
+                print(pre_line + " -- " "apply negative obj_linkedobj:")
+                print(
+                    pre_line + "    "
+                    "obj_linkedobj '{}' ".format(obj_linkedobj.Placement.Base)
+                )
                 self.handle_placement(
-                    obj_parent,
+                    obj_linkedobj,
                     bobj,
                     enable_scale=False,
-                    relative=True
+                    relative=True,
+                    negative=True
                 )
-                # print(pre_line + "bobj.location", bobj.location)
+                print(
+                    pre_line + "    "
+                    "bobj '{}' ".format(bobj.location)
+                )
         else:
             self.config["report"]({'WARNING'}, (
                 pre_line +
@@ -652,6 +681,15 @@ class ImportFcstd(object):
     ):
         """Add or update link target object."""
         pre_line = func_data["pre_line"]
+        # print(
+        #     pre_line +
+        #     "$ obj: '{}' '{}' parent: '{}'"
+        #     "".format(
+        #         obj,
+        #         obj.Label,
+        #         obj.getParentGeoFeatureGroup()
+        #     )
+        # )
         if obj_linkedobj_label in bpy.data.collections:
             print(pre_line + "TODO: implement update.")
         else:
@@ -679,28 +717,9 @@ class ImportFcstd(object):
             bobj = func_data_obj_linked["bobj"]
 
             # fix parent linking
-            # print(
-            #     pre_line +
-            #     "$ obj: '{}' '{}' parent: '{}'"
-            #     "".format(
-            #         obj,
-            #         obj.Label,
-            #         obj.getParentGeoFeatureGroup()
-            #     )
-            # )
             obj_parent = obj_linked.getParentGeoFeatureGroup()
-            print(
-                pre_line +
-                "$ obj_parent: '{}'"
-                "".format(obj_parent)
-            )
             parent_label = self.get_obj_label(obj_parent)
             if parent_label:
-                print(
-                    pre_line +
-                    "$ parent_label: '{}'"
-                    "".format(parent_label)
-                )
                 bobj_parent = bpy.data.objects[parent_label]
                 if bobj_parent:
                     bobj.parent = bobj_parent
@@ -851,6 +870,7 @@ class ImportFcstd(object):
             obj,
             obj_label,
             obj_parent,
+            obj_linkedobj,
             obj_linkedobj_label,
         )
         print(pre_line + "handle__AppLinkElement   DONE")
