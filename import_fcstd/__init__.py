@@ -10,9 +10,10 @@ import os
 from .. import freecad_helper as fc_helper
 from .. import blender_helper as b_helper
 
+from . import helper
 from . import guidata
+from . material import MaterialManager
 
-from bpy_extras.node_shader_utils import PrincipledBSDFWrapper
 
 # set to True to triangulate all faces (will loose multimaterial info)
 TRIANGULATE = False
@@ -122,17 +123,6 @@ class ImportFcstd(object):
             self.config["obj_name_prefix"] + label
         return label
 
-    def rename_old_data(self, data, data_label):
-        """Recusive add '_old' to data object."""
-        name_old = None
-        if data_label in data:
-            name_old = data[data_label].name + "_old"
-            if name_old in data:
-                # rename recusive..
-                self.rename_old_data(data, name_old)
-            data[data_label].name = name_old
-        return name_old
-
     def check_obj_visibility(self, obj):
         """Check if obj is visible."""
         result = True
@@ -154,130 +144,6 @@ class ImportFcstd(object):
             else:
                 result = self.check_obj_visibility(obj)
         return result
-
-    # material
-    def get_obj_Transparency(self, obj_Name):
-        """Get object Transparency and convert to blender units."""
-        alpha = 1.0
-        if "Transparency" in self.guidata[obj_Name]:
-            if self.guidata[obj_Name]["Transparency"] > 0:
-                alpha = (100 - self.guidata[obj_Name]["Transparency"]) / 100.0
-        return alpha
-
-    def get_obj_ShapeColor(self, obj_Name):
-        """Get object ShapeColor and convert to blender units."""
-        rgb = (0.5, 0.5, 0.5)
-        if "ShapeColor" in self.guidata[obj_Name]:
-            rgb = self.guidata[obj_Name]["ShapeColor"]
-        return rgb
-
-    def get_obj_DiffuseColor(self, obj_Name, i):
-        """Get object DiffuseColor and convert to blender units."""
-        # DiffuseColor stores int values, Blender use floats
-        rgba = tuple([
-            float(x) / 255.0
-            for x in self.guidata[obj_Name]["DiffuseColor"][i]
-        ])
-        return rgba
-
-    def get_obj_rgba(self, obj_Name, mat_index=None):
-        """Get object rgba value in blender usable format."""
-        if mat_index:
-            rgba = self.get_obj_DiffuseColor(obj_Name, mat_index)
-            # FreeCAD stores transparency, not alpha
-            alpha = 1.0
-            if rgba[3] > 0:
-                alpha = 1.0 - rgba[3]
-            rgba = rgba[:3] + (alpha,)
-        else:
-            alpha = self.get_obj_Transparency(obj_Name)
-            rgb = self.get_obj_ShapeColor(obj_Name)
-            rgba = rgb+(alpha,)
-        return rgba
-
-    def create_new_bmat(self, bmat_name, rgba, func_data):
-        """Create new blender material."""
-        bmat = bpy.data.materials.new(name=bmat_name)
-        bmat.use_nodes = True
-        # link bmat to PrincipledBSDFWrapper
-        principled = PrincipledBSDFWrapper(bmat, is_readonly=False)
-        principled.base_color = rgba[:3]
-        # check for alpha
-        if rgba[3] < 1.0:
-            bmat.diffuse_color = rgba
-            principled.alpha = rgba[3]
-            bmat.blend_method = "BLEND"
-        if self.config["sharemats"]:
-            func_data["matdatabase"][rgba] = bmat
-        return bmat
-
-    def handle_material_per_face(self, func_data, bobj, fi, objmats, i):
-        """Handle material for face."""
-        # Create new mats and attribute faces to them
-        # DiffuseColor stores int values, Blender use floats
-        rgba = self.get_obj_rgba(func_data["obj"].Name, i)
-        bmat = None
-        if self.config["sharemats"]:
-            if rgba in func_data["matdatabase"]:
-                bmat = func_data["matdatabase"][rgba]
-                if rgba not in objmats:
-                    objmats.append(rgba)
-                    bobj.data.materials.append(bmat)
-        if not bmat:
-            if rgba in objmats:
-                bmat = bobj.data.materials[objmats.index(rgba)]
-        if not bmat:
-            bmat_name = self.get_obj_label(
-                func_data["obj"]) + "_" + str(len(objmats))
-            bmat = self.create_new_bmat(bmat_name, rgba, func_data)
-            objmats.append(rgba)
-            # TODO: please check if this is really correct..
-            bobj.data.materials.append(bmat)
-
-        # assigne materials to polygons
-        for fj in range(func_data["matindex"][i]):
-            bobj.data.polygons[fi+fj].material_index = objmats.index(rgba)
-        fi += func_data["matindex"][i]
-
-    def handle_material_multi(self, func_data, bobj):
-        """Handle multi material."""
-        # we have per-face materials.
-        fi = 0
-        objmats = []
-        for i in range(len(func_data["matindex"])):
-            self.handle_material_per_face(func_data, bobj, fi, objmats, i)
-
-    def handle_material_single(self, func_data, bobj):
-        """Handle single material."""
-        # one material for the whole object
-        rgba = self.get_obj_rgba(func_data["obj"].Name)
-        bmat = None
-        if self.config["sharemats"]:
-            if rgba in func_data["matdatabase"]:
-                bmat = func_data["matdatabase"][rgba]
-            else:
-                # print("not found in db:",rgba,"in",matdatabase)
-                pass
-        if not bmat:
-            bmat_name = self.get_obj_label(func_data["obj"])
-            bmat = self.create_new_bmat(bmat_name, rgba, func_data)
-        bobj.data.materials.append(bmat)
-
-    def handle_material_new(self, func_data, bobj):
-        """Handle material creation."""
-        # check if we have a material at all...
-        if func_data["obj"].Name in self.guidata:
-            # check if we have 'per face' or 'object' coloring.
-            if (
-                func_data["matindex"]
-                and ("DiffuseColor" in self.guidata[func_data["obj"].Name])
-                and (len(func_data["matindex"]) == len(
-                    self.guidata[func_data["obj"].Name]["DiffuseColor"])
-                )
-            ):
-                self.handle_material_multi(func_data, bobj)
-            else:
-                self.handle_material_single(func_data, bobj)
 
     # ##########################################
     # object handling
@@ -354,7 +220,7 @@ class ImportFcstd(object):
                 )
                 # rename old mesh -
                 # this way the new mesh can get the original name.
-                self.rename_old_data(bpy.data.meshes, obj_label)
+                helper.rename_old_data(bpy.data.meshes, obj_label)
 
         bmesh = bpy.data.meshes.new(name=obj_label)
         bmesh.from_pydata(
@@ -374,7 +240,15 @@ class ImportFcstd(object):
             # create new object
             bobj = bpy.data.objects.new(obj_label, bmesh)
             self.handle_placement(func_data["obj"], bobj)
-            self.handle_material_new(func_data, bobj)
+            # self.handle_material_new(func_data, bobj)
+            material_manager = MaterialManager(
+                guidata=self.guidata,
+                func_data=func_data,
+                bobj=bobj,
+                obj_label=self.get_obj_label(func_data["obj"]),
+                sharemats=self.config["sharemats"]
+            )
+            material_manager.create_new()
 
         if self.config['update']:
             if bobj.name not in func_data["collection"].objects:
@@ -405,7 +279,7 @@ class ImportFcstd(object):
             if collection_label in bpy.data.collections:
                 temp_collection = bpy.data.collections[collection_label]
         else:
-            self.rename_old_data(bpy.data.collections, collection_label)
+            helper.rename_old_data(bpy.data.collections, collection_label)
 
         if not temp_collection:
             # create new
@@ -463,7 +337,7 @@ class ImportFcstd(object):
                     #     "update: '{}'".format(parent_empty)
                     # )
             else:
-                renamed_to = self.rename_old_data(
+                renamed_to = helper.rename_old_data(
                     bpy.data.objects, parent_label)
                 print(
                     pre_line +
@@ -478,6 +352,7 @@ class ImportFcstd(object):
                 name=parent_label,
                 object_data=None
             )
+            parent_empty.empty_display_size = 0.01
             self.set_obj_parent_and_collection(
                 pre_line, func_data, parent_empty)
 

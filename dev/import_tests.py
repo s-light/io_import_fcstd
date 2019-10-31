@@ -105,7 +105,9 @@ print("from io_import_fcstd import import_fcstd")
 # pylama:ignore=E402
 from io_import_fcstd import import_fcstd
 importlib.reload(import_fcstd)
+importlib.reload(import_fcstd.helper)
 importlib.reload(import_fcstd.guidata)
+importlib.reload(import_fcstd.material)
 importlib.reload(import_fcstd.fc_helper)
 importlib.reload(import_fcstd.b_helper)
 
