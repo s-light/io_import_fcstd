@@ -161,8 +161,9 @@ class IMPORT_OT_FreeCAD(bpy.types.Operator):
 
     def get_preferences(self):
         """Get addon preferences."""
+        print("__package__: '{}'".format(__package__))
         user_preferences = bpy.context.preferences
-        addon_prefs = user_preferences.addons["io_import_fcstd"].preferences
+        addon_prefs = user_preferences.addons[__package__].preferences
         return addon_prefs
 
     def get_freecad_path(self):
