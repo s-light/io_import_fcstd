@@ -204,6 +204,34 @@ class ImportFcstd(object):
                     self.config["scale"]
                 )
 
+    def update_tree(self, func_data):
+        """Update object tree."""
+        pre_line = func_data["pre_line"]
+        bobj = func_data["bobj"]
+
+        add_to_collection = False
+        if self.config['update']:
+            if bobj.name not in func_data["collection"].objects:
+                add_to_collection = True
+            else:
+                print(
+                    pre_line +
+                    "'{}' already in collection '{}'"
+                    "".format(bobj.name, func_data["collection"])
+                )
+        else:
+            add_to_collection = True
+
+        if add_to_collection:
+            func_data["collection"].objects.link(bobj)
+            if bobj.parent is None:
+                bobj.parent = func_data["bobj_parent"]
+                print(
+                    pre_line +
+                    "'{}' set parent to '{}' "
+                    "".format(bobj, func_data["bobj_parent"])
+                )
+
     def add_or_update_blender_obj(self, func_data):
         """Create or update object with mesh and material data."""
         pre_line = func_data["pre_line"]
@@ -250,19 +278,6 @@ class ImportFcstd(object):
             )
             material_manager.create_new()
 
-        if self.config['update']:
-            if bobj.name not in func_data["collection"].objects:
-                func_data["collection"].objects.link(bobj)
-                bobj.parent = func_data["bobj_parent"]
-            else:
-                print(
-                    pre_line +
-                    "'{}' already in collection '{}'"
-                    "".format(bobj.name, func_data["collection"])
-                )
-        else:
-            func_data["collection"].objects.link(bobj)
-            bobj.parent = func_data["bobj_parent"]
         # bpy.context.scene.objects.active = func_data["obj"]
         # obj.select = True
         func_data["bobj"] = bobj
@@ -296,11 +311,11 @@ class ImportFcstd(object):
     def set_obj_parent_and_collection(self, pre_line, func_data, bobj):
         """Set Object parent and collection."""
         bobj.parent = func_data["bobj_parent"]
-        # print(
-        #     pre_line +
-        #     "'{}' set parent to '{}' "
-        #     "".format(bobj, func_data["bobj_parent"])
-        # )
+        print(
+            pre_line +
+            "'{}' set parent to '{}' "
+            "".format(bobj, func_data["bobj_parent"])
+        )
 
         # add object to current collection
         collection = func_data["collection"]
@@ -662,7 +677,39 @@ class ImportFcstd(object):
                 pre_line=pre_line + '    '
             )
             bobj = func_data_obj_linked["bobj"]
-            # print(">> bobj", bobj)
+
+            # fix parent linking
+            # print(
+            #     pre_line +
+            #     "$ obj: '{}' '{}' parent: '{}'"
+            #     "".format(
+            #         obj,
+            #         obj.Label,
+            #         obj.getParentGeoFeatureGroup()
+            #     )
+            # )
+            obj_parent = obj_linked.getParentGeoFeatureGroup()
+            print(
+                pre_line +
+                "$ obj_parent: '{}'"
+                "".format(obj_parent)
+            )
+            parent_label = self.get_obj_label(obj_parent)
+            if parent_label:
+                print(
+                    pre_line +
+                    "$ parent_label: '{}'"
+                    "".format(parent_label)
+                )
+                bobj_parent = bpy.data.objects[parent_label]
+                if bobj_parent:
+                    bobj.parent = bobj_parent
+                    print(
+                        pre_line +
+                        "'{}' set parent to '{}' "
+                        "".format(bobj, bobj_parent)
+                    )
+
             print(
                 pre_line + "$ created bobj: ",
                 bobj
@@ -1000,6 +1047,7 @@ class ImportFcstd(object):
                 and (func_data["faces"] or func_data["edges"])
             ):
                 self.add_or_update_blender_obj(func_data)
+                self.update_tree(func_data)
         return func_data
 
     def import_doc_content(self, doc):
