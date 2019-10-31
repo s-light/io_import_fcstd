@@ -196,6 +196,28 @@ class ImportFcstd(object):
             data[data_label].name = name_old
         return name_old
 
+    def check_obj_visibility(self, obj):
+        """Check if obj is visible."""
+        result = True
+        if (
+            obj.Name in self.guidata
+            and "Visibility" in self.guidata[obj.Name]
+        ):
+            if self.guidata[obj.Name]["Visibility"] is False:
+                result = False
+        return result
+
+    def check_obj_visibility_with_skiphidden(self, obj, obj_visibility=None):
+        """Check if obj is visible."""
+        result = True
+        if self.config["skiphidden"]:
+            # print("obj_visibility: '{}'".format(obj_visibility))
+            if obj_visibility is not None:
+                result = obj_visibility
+            else:
+                result = self.check_obj_visibility(obj)
+        return result
+
     # material
     def get_obj_Transparency(self, obj_Name):
         """Get object Transparency and convert to blender units."""
@@ -463,11 +485,11 @@ class ImportFcstd(object):
     def set_obj_parent_and_collection(self, pre_line, func_data, bobj):
         """Set Object parent and collection."""
         bobj.parent = func_data["bobj_parent"]
-        print(
-            pre_line +
-            "'{}' set parent to '{}' "
-            "".format(bobj, func_data["bobj_parent"])
-        )
+        # print(
+        #     pre_line +
+        #     "'{}' set parent to '{}' "
+        #     "".format(bobj, func_data["bobj_parent"])
+        # )
 
         # add object to current collection
         collection = func_data["collection"]
@@ -475,11 +497,11 @@ class ImportFcstd(object):
             collection = self.fcstd_collection
         if bobj.name not in collection.objects:
             collection.objects.link(bobj)
-            print(
-                pre_line +
-                "'{}' add to '{}' "
-                "".format(bobj, collection)
-            )
+            # print(
+            #     pre_line +
+            #     "'{}' add to '{}' "
+            #     "".format(bobj, collection)
+            # )
 
     def parent_empty_add_or_update(self, func_data, parent_label):
         """Parent Empty handle add or update."""
@@ -493,16 +515,16 @@ class ImportFcstd(object):
         obj = func_data["obj"]
 
         if parent_label in bpy.data.objects:
-            print(
-                pre_line +
-                "'{}' already in objects list.".format(parent_label)
-            )
+            # print(
+            #     pre_line +
+            #     "'{}' already in objects list.".format(parent_label)
+            # )
             if self.config["update"]:
                     parent_empty = bpy.data.objects[parent_label]
-                    print(
-                        pre_line +
-                        "update: '{}'".format(parent_empty)
-                    )
+                    # print(
+                    #     pre_line +
+                    #     "update: '{}'".format(parent_empty)
+                    # )
             else:
                 renamed_to = self.rename_old_data(
                     bpy.data.objects, parent_label)
@@ -530,13 +552,13 @@ class ImportFcstd(object):
                     parent_empty,
                     enable_scale=False,
                 )
-                print(
-                    pre_line +
-                    "'{}' set position"
-                    "".format(parent_empty)
-                    # "'{}' set position to '{}'"
-                    # "".format(parent_empty, position)
-                )
+                # print(
+                #     pre_line +
+                #     "'{}' set position"
+                #     "".format(parent_empty)
+                #     # "'{}' set position to '{}'"
+                #     # "".format(parent_empty, position)
+                # )
 
         # update func_data links
         func_data["obj_parent"] = obj
@@ -572,7 +594,7 @@ class ImportFcstd(object):
         self,
         func_data,
         sub_objects,
-        include_only_visible=True
+        include_only_visible=True,
     ):
         """Handle sub objects."""
         pre_line = func_data["pre_line"]
@@ -581,12 +603,37 @@ class ImportFcstd(object):
             pre_line +
             "handle__object_with_sub_objects '{}'".format(parent_label)
         )
+        # print(
+        #     pre_line +
+        #     "include_only_visible '{}'".format(include_only_visible)
+        # )
+        # pre_line += "→ "
         # self.sub_collection_add_or_update(func_data, parent_label)
         self.parent_empty_add_or_update(func_data, parent_label)
         if len(sub_objects) > 0:
+            print(
+                pre_line +
+                "→  len(sub_objects) '{}'".format(len(sub_objects))
+            )
+            # print(
+            #     pre_line +
+            #     "→  include_only_visible '{}'".format(include_only_visible)
+            # )
+
+            sub_filter_visible = False
+            if not isinstance(include_only_visible, list):
+                # convert True or False to list
+                include_only_visible = [None] * len(sub_objects)
+                sub_filter_visible = True
+            # print(
+            #     pre_line +
+            #     "include_only_visible '{}'"
+            #     "".format(include_only_visible)
+            # )
+
             sub_objects = fc_helper.filtered_objects(
                 sub_objects,
-                include_only_visible=include_only_visible
+                include_only_visible=sub_filter_visible
             )
             print(
                 b_helper.colors.bold
@@ -595,16 +642,37 @@ class ImportFcstd(object):
                 + "Import {} Recusive:".format(len(sub_objects))
                 + b_helper.colors.reset
             )
-            for obj in sub_objects:
+
+            for index, obj in enumerate(sub_objects):
                 self.print_obj(obj, pre_line + "- ")
-                self.import_obj(
-                    obj=obj,
-                    collection=func_data["collection"],
-                    collection_parent=func_data["collection_parent"],
-                    obj_parent=func_data["obj_parent"],
-                    bobj_parent=func_data["bobj_parent"],
-                    pre_line=pre_line + '    '
-                )
+                # TODO: find way to get real Visibility state.
+                # Issue: #10
+                # https://github.com/s-light/io_import_fcstd/issues/10
+                # print(
+                #     pre_line +
+                #     "include_only_visible[index] '{}'"
+                #     "".format(include_only_visible[index])
+                # )
+                if self.check_obj_visibility_with_skiphidden(
+                    obj,
+                    include_only_visible[index]
+                ):
+                    self.import_obj(
+                        obj=obj,
+                        collection=func_data["collection"],
+                        collection_parent=func_data["collection_parent"],
+                        obj_parent=func_data["obj_parent"],
+                        bobj_parent=func_data["bobj_parent"],
+                        pre_line=pre_line + "    "
+                    )
+                else:
+                    print(
+                        b_helper.colors.fg.darkgrey
+                        + pre_line
+                        + "    "
+                        + "skipping - is hidden"
+                        + b_helper.colors.reset
+                    )
         else:
             print(
                 b_helper.colors.fg.darkgrey
@@ -619,7 +687,7 @@ class ImportFcstd(object):
     # Arrays and similar
     def handle__ObjectWithElementList(self, func_data):
         """Handle Part::Feature objects."""
-        # pre_line = func_data["pre_line"]
+        pre_line = func_data["pre_line"]
         # obj = func_data["obj"]
         # self.config["report"]({'WARNING'}, (
         #     pre_line +
@@ -631,10 +699,17 @@ class ImportFcstd(object):
         #     func_data["obj"].ElementList,
         #     pre_line=pre_line
         # )
+        include_only_visible = [*func_data["obj"].VisibilityList]
+        print(
+            pre_line +
+            "handle__ObjectWithElementList "
+            "VisibilityList: '{}'"
+            "".format(include_only_visible)
+        )
         self.handle__object_with_sub_objects(
             func_data,
             func_data["obj"].ElementList,
-            include_only_visible=False
+            include_only_visible=include_only_visible
         )
 
     # Part::FeaturePhython
@@ -826,8 +901,11 @@ class ImportFcstd(object):
         self.config["report"]({'WARNING'}, (
             pre_line +
             "'{}' ('{}') of type '{}': "
-            "Warning: App::Link handling is highly experimental!!"
             "".format(obj.Label, obj.Name, obj.TypeId)
+        ))
+        self.config["report"]({'WARNING'}, (
+            pre_line +
+            "  Warning: App::Link handling is highly experimental!!"
         ))
         obj_label = self.get_obj_label(obj)
         # obj_linkedobj_label = self.get_obj_linkedobj_label(obj)
@@ -1112,18 +1190,6 @@ class ImportFcstd(object):
                 self.add_or_update_blender_obj(func_data)
         return func_data
 
-    def check_visibility_skip(self, obj):
-        """Check if obj is visible."""
-        result = True
-        if (
-            self.config["skiphidden"]
-            and obj.Name in self.guidata
-            and "Visibility" in self.guidata[obj.Name]
-        ):
-            if self.guidata[obj.Name]["Visibility"] is False:
-                result = False
-        return result
-
     def import_doc_content(self, doc):
         """Import document content = filterd objects."""
         obj_list = fc_helper.get_root_objects(
@@ -1144,7 +1210,7 @@ class ImportFcstd(object):
         print("-"*21)
         self.config["report"]({'INFO'}, "Import:")
         for obj in obj_list:
-            if self.check_visibility_skip(obj):
+            if self.check_obj_visibility_with_skiphidden(obj):
                 self.print_obj(obj, pre_line="- ")
                 self.import_obj(
                     obj=obj,

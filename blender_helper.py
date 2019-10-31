@@ -3,7 +3,7 @@
 
 """Random Helper Functions & Classe for Blender Python Scripting."""
 
-import re
+# import re
 
 try:
     import bpy

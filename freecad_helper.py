@@ -146,7 +146,12 @@ def filtered_objects(
                     if obj.Visibility:
                         result_objects.append(obj)
                 else:
-                    print("obj has no Visibility attribute.")
+                    print(
+                        "filtered_objects: "
+                        "obj '{}' has no Visibility attribute."
+                        "it is excluded from results."
+                        "".format(obj.Name)
+                    )
             else:
                 result_objects.append(obj)
     return result_objects
