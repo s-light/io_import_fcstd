@@ -9,8 +9,8 @@ import xml.sax
 import zipfile
 import os
 
-from . import freecad_helper as fc_helper
-from . import blender_helper as b_helper
+from .. import freecad_helper as fc_helper
+from .. import blender_helper as b_helper
 
 
 from bpy_extras.node_shader_utils import PrincipledBSDFWrapper
