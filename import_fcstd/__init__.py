@@ -24,23 +24,25 @@ class ImportFcstd(object):
 
     def __init__(
         self,
-        filename=None,
+        # filename=None,
         update=True,
         placement=True,
+        scale=0.001,
         tessellation=1.0,
         skiphidden=True,
         filter_sketch=True,
-        scale=0.001,
         sharemats=True,
         update_materials=False,
         obj_name_prefix="",
+        obj_name_prefix_with_filename=False,
+        links_as_collectioninstance=True,
         path_to_freecad=None,
         report=None
     ):
         """Init."""
         super(ImportFcstd, self).__init__()
         self.config = {
-            "filename": filename,
+            "filename": None,
             "update": update,
             "placement": placement,
             "tessellation": tessellation,
@@ -49,7 +51,9 @@ class ImportFcstd(object):
             "scale": scale,
             "sharemats": sharemats,
             "update_materials": update_materials,
+            "obj_name_prefix_with_filename": obj_name_prefix_with_filename,
             "obj_name_prefix": obj_name_prefix,
+            "links_as_collectioninstance": links_as_collectioninstance,
             "report": self.print_report,
         }
         self.path_to_freecad = path_to_freecad
@@ -89,6 +93,15 @@ class ImportFcstd(object):
             message
         )
 
+    def handle_label_prefix(self, label):
+        """Handle all label prefix processing."""
+        if label:
+            prefix = self.config["obj_name_prefix"]
+            if self.config["obj_name_prefix_with_filename"]:
+                prefix = self.doc.Name + "__" + prefix
+            label = prefix + "__" + label
+        return label
+
     def get_obj_label(self, obj):
         """Get object label with optional prefix."""
         label = None
@@ -96,21 +109,17 @@ class ImportFcstd(object):
             obj_label = "NONE"
             obj_label = obj.Label
             label = obj_label
-        if label:
-            self.config["obj_name_prefix"] + label
+        label = self.handle_label_prefix(label)
         return label
 
     def get_obj_linkedobj_label(self, obj):
         """Get linkedobject label with optional prefix."""
         label = None
         if hasattr(obj, "LinkedObject"):
-            obj_linked_label = "NONE"
+            label = "NONE"
             if obj.LinkedObject:
-                obj_linked_label = obj.LinkedObject.Label
-            label = (
-                self.config["obj_name_prefix"]
-                + obj_linked_label
-            )
+                label = obj.LinkedObject.Label
+        label = self.handle_label_prefix(label)
         return label
 
     def get_obj_combined_label(self, parent_obj, obj):
@@ -120,8 +129,7 @@ class ImportFcstd(object):
             + "__"
             + obj.Label
         )
-        if label:
-            self.config["obj_name_prefix"] + label
+        label = self.handle_label_prefix(label)
         return label
 
     def fix_link_target_name(self, bobj):

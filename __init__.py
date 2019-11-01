@@ -27,14 +27,6 @@ bl_info = {
 # brut force path loading:
 # import sys; sys.path.append("/path/to/FreeCAD.so")
 
-# pre git HISTORY
-# v1.0.0 - 12 june 2018 - initial release - basically working
-# v2.0.0 - 21 june 2018 - option to turn cycles mat on/off, per-face material support,
-#                         use of polygons when possible, shared materials
-# v3.0.0 - 06 february 2019 - ported to Blender 2.80
-# v4.0.0 - 07 february 2019 - API changes + support of transparency
-# v5.0.0 - 13 august 2019 - small fixes and better info messages if things go wrong
-
 
 # ==============================================================================
 # Blender Operator class
@@ -48,6 +40,12 @@ class IMPORT_OT_FreeCAD_Preferences(bpy.types.AddonPreferences):
     # when defining this in a submodule of a python package.
     # bl_idname = __name__
     bl_idname = __package__
+
+    # TODO: implement 'auto-magically' finding lib folder
+    # as a first just implement a list of predefined paths
+    # and use the first that exists
+
+    # TODO: implement file-choose dialog for the path
 
     filepath: bpy.props.StringProperty(
         subtype='FILE_PATH',
@@ -153,6 +151,40 @@ class IMPORT_OT_FreeCAD(bpy.types.Operator):
     #         "as in the FreeCAD Object-Tree."
     #     )
     # )
+    option_obj_name_prefix: bpy.props.StringProperty(
+        name="Prefix object names",
+        maxlen=42,
+        default="",
+        description=(
+            "prefix for every object name."
+            ""
+        ),
+    )
+    option_prefix_with_filename: bpy.props.BoolProperty(
+        name="Prefix object names with filename",
+        default=False,
+        description=(
+            "recommend for multi-file import. \n"
+            "otherwise it can create name confusions."
+            ""
+        ),
+    )
+    option_links_as_col: bpy.props.BoolProperty(
+        name="EXPERIMENTAL!! App::Link as Collection-Instances",
+        default=True,
+        description=(
+            "create App::Link objects as Collection-Instances. \n"
+            "therefore create Link-Targets as Collections. \n"
+            "this means the instances can only have the original "
+            "material of the Link-Target.\n"
+            "\n"
+            "if you deactivate this the importer creates `real objects` "
+            "for every App::Link object - they share the mesh. "
+            "this can get very deep tree if the Link-Targets are "
+            "App::Part objects themself.."
+            ""
+        ),
+    )
 
     def invoke(self, context, event):
         """Invoke is called when the user picks our Import menu entry."""
@@ -184,13 +216,17 @@ class IMPORT_OT_FreeCAD(bpy.types.Operator):
                 my_importer = import_fcstd.ImportFcstd(
                     update=self.option_update,
                     placement=self.option_placement,
+                    scale=self.option_scale,
                     tessellation=self.option_tessellation,
                     skiphidden=self.option_skiphidden,
                     filter_sketch=self.option_filter_sketch,
-                    scale=self.option_scale,
                     sharemats=self.option_sharemats,
-                    report=self.report,
-                    path_to_freecad=path_to_freecad
+                    update_materials=False,
+                    obj_name_prefix=self.option_obj_name_prefix,
+                    obj_name_prefix_with_filename=self.option_prefix_with_filename,
+                    links_as_collectioninstance=self.option_links_as_col,
+                    path_to_freecad=path_to_freecad,
+                    report=self.report
                 )
                 return my_importer.import_fcstd(filename=dir+filestr)
         return {'FINISHED'}

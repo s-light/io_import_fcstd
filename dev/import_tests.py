@@ -172,15 +172,19 @@ def main_test():
     print("FreeCAD document to import:", filename)
 
     my_importer = import_fcstd.ImportFcstd(
-        # update=self.option_update,
-        # placement=self.option_placement,
-        # tessellation=self.option_tessellation,
-        # skiphidden=self.option_skiphidden,
-        # filter_sketch=self.option_filter_sketch,
-        # scale=self.option_scale,
-        # sharemats=self.option_sharemats,
+        # update=True,
+        # placement=True,
+        # scale=0.001,
+        # tessellation=1.0,
+        # skiphidden=True,
+        # filter_sketch=True,
+        # sharemats=True,
+        # update_materials=False,
+        # obj_name_prefix="",
+        # obj_name_prefix_with_filename=False,
+        # links_as_collectioninstance=True,
         path_to_freecad=path_to_freecad,
-        # report=self.report,
+        # report=None
     )
     my_importer.import_fcstd(filename=filename)
 
