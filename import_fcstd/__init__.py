@@ -6,6 +6,7 @@
 import sys
 import bpy
 import os
+import pprint
 
 from .. import freecad_helper as fc_helper
 from .. import blender_helper as b_helper
@@ -99,16 +100,26 @@ class ImportFcstd(object):
             prefix = self.config["obj_name_prefix"]
             if self.config["obj_name_prefix_with_filename"]:
                 prefix = self.doc.Name + "__" + prefix
-            label = prefix + "__" + label
+            if prefix:
+                label = prefix + "__" + label
         return label
 
     def get_obj_label(self, obj):
         """Get object label with optional prefix."""
         label = None
         if obj:
-            obj_label = "NONE"
-            obj_label = obj.Label
-            label = obj_label
+            # obj_label = "NONE"
+            # obj_label = obj.Label
+            # label = obj_label
+            label = obj.Label
+        label = self.handle_label_prefix(label)
+        return label
+
+    def get_obj_link_target_label(self, obj):
+        """Get object label with optional prefix."""
+        label = None
+        if obj:
+            label = obj.Label + "__lt"
         label = self.handle_label_prefix(label)
         return label
 
@@ -135,6 +146,7 @@ class ImportFcstd(object):
     def fix_link_target_name(self, bobj):
         """Fix name of link target object."""
         bobj.name = bobj.name + "__lt"
+        return bobj.name
 
     def check_obj_visibility(self, obj):
         """Check if obj is visible."""
@@ -594,12 +606,11 @@ class ImportFcstd(object):
     # App::Link*
     def add_or_update_collection_instance(
         self,
+        *,
         func_data,
         obj,
         obj_label,
-        obj_parent,
-        obj_linkedobj,
-        linkedobj_label,
+        instance_target_label,
     ):
         """Add or update collection instance object."""
         pre_line = func_data["pre_line"]
@@ -610,7 +621,7 @@ class ImportFcstd(object):
         )
         pre_line = pre_line + ">  "
         print(pre_line + "obj_label '{}'".format(obj_label))
-        print(pre_line + "linkedobj_label '{}'".format(linkedobj_label))
+        print(pre_line + "instance_target_label '{}'".format(instance_target_label))
         print(
             pre_line +
             "func_data[collection] '{}'"
@@ -619,8 +630,8 @@ class ImportFcstd(object):
 
         base_collection = None
         bobj = None
-        if linkedobj_label in bpy.data.collections:
-            base_collection = bpy.data.collections[linkedobj_label]
+        if instance_target_label in bpy.data.collections:
+            base_collection = bpy.data.collections[instance_target_label]
             flag_new = False
             if obj_label in bpy.data.objects:
                 bobj = bpy.data.objects[obj_label]
@@ -649,19 +660,27 @@ class ImportFcstd(object):
                 pre_line +
                 "Warning: can't add or update instance. "
                 "'{}' collection not found."
-                "".format(linkedobj_label)
+                "".format(instance_target_label)
             ))
             return False
 
     def add_or_update_link_target(
         self,
+        *,
         func_data,
         obj,
-        obj_linked,
+        obj_linkedobj,
         obj_linkedobj_label,
     ):
         """Add or update link target object."""
         pre_line = func_data["pre_line"]
+        # print(
+        #     pre_line +
+        #     "$ add_or_update_link_target: '{}'"
+        #     "".format(
+        #         obj_linkedobj_label,
+        #     )
+        # )
         # print(
         #     pre_line +
         #     "$ obj: '{}' '{}' parent: '{}'"
@@ -689,13 +708,19 @@ class ImportFcstd(object):
             #     ))
             # else:
             func_data_obj_linked = self.import_obj(
-                obj=obj_linked,
+                obj=obj_linkedobj,
                 collection=None,
                 collection_parent=None,
                 bobj_parent=None,
                 pre_line=pre_line + '    '
             )
             bobj = func_data_obj_linked["bobj"]
+            # print(
+            #    pre_line +
+            #    "func_data_obj_linked '{}' "
+            #    "".format(func_data_obj_linked)
+            # )
+            # pprint.pprint(func_data_obj_linked)
 
             # fix parent linking
             # obj_parent = obj_linked.getParentGeoFeatureGroup()
@@ -710,6 +735,7 @@ class ImportFcstd(object):
             #             "".format(bobj, bobj_parent)
             #         )
             # this has no parent as we use only the raw obj.
+
             bobj.parent = None
             self.reset_placement_position(bobj)
             # print(
@@ -809,14 +835,15 @@ class ImportFcstd(object):
             ))
         print(pre_line + "handle__AppLink   DONE")
 
-    def handle__AppLinkElement(self, func_data):
+    def handle__AppLinkElement(self, func_data, obj_linkedobj=None):
         """Handle App::LinkElement objects."""
         print(func_data["pre_line"] + "handle__AppLinkElement:")
         func_data["pre_line"] += "| "
         pre_line = func_data["pre_line"]
 
         obj = func_data["obj"]
-        obj_linkedobj = func_data["obj"].LinkedObject
+        if obj_linkedobj is None:
+            obj_linkedobj = func_data["obj"].LinkedObject
         if hasattr(obj_linkedobj, "LinkedObject"):
             # if we have Arrays they  have a intermediet link object..
             # we skip this..
@@ -830,12 +857,12 @@ class ImportFcstd(object):
         #     "".format(obj.Label, obj.Name, obj.TypeId)
         # ))
 
-        obj_parent_label = self.get_obj_label(obj_parent)
+        # obj_parent_label = self.get_obj_label(obj_parent)
         obj_label = self.get_obj_combined_label(obj_parent, obj)
         obj_linkedobj_label = self.get_obj_linkedobj_label(obj)
 
         # print(pre_line + "collection:", func_data["collection"])
-        print(pre_line + "obj_parent_label:", obj_parent_label)
+        # print(pre_line + "obj_parent_label:", obj_parent_label)
         print(pre_line + "obj_label:", obj_label)
         print(pre_line + "obj_linkedobj_label:", obj_linkedobj_label)
         fc_helper.print_obj(
@@ -850,19 +877,17 @@ class ImportFcstd(object):
         # fc_helper.print_obj(obj_linked.LinkedObject, pre_line=pre_line)
 
         self.add_or_update_link_target(
-            func_data,
-            obj,
-            obj_linkedobj,
-            obj_linkedobj_label,
+            func_data=func_data,
+            obj=obj,
+            obj_linkedobj=obj_linkedobj,
+            obj_linkedobj_label=obj_linkedobj_label,
         )
 
         self.add_or_update_collection_instance(
-            func_data,
-            obj,
-            obj_label,
-            obj_parent,
-            obj_linkedobj,
-            obj_linkedobj_label,
+            func_data=func_data,
+            obj=obj,
+            obj_label=obj_label,
+            instance_target_label=obj_linkedobj_label,
         )
         print(pre_line + "handle__AppLinkElement   DONE")
 
@@ -975,17 +1000,70 @@ class ImportFcstd(object):
 
     def handle__PartFeature(self, func_data):
         """Handle Part::Feature objects."""
-        # pre_line = func_data["pre_line"]
-        obj_label = self.get_obj_label(func_data["obj"])
+        print(func_data["pre_line"] + "handle__PartFeature:")
+        pre_line = func_data["pre_line"]
+        obj = func_data["obj"]
+        obj_label = self.get_obj_label(obj)
+        import_it = False
         # check if this Part::Feature object is already imported.
-        if obj_label in self.link_targets.children:
-            bobj_link_target = bpy.data.objects[obj_label]
-            self.fix_link_target_name(bobj_link_target)
-            bmesh = bobj_link_target.data
-            bobj = self.create_bobj_from_bmesh(func_data, bmesh)
-            func_data["bobj"] = bobj
-            func_data["update_tree"] = True
+        if self.config["links_as_collectioninstance"]:
+            self.config["report"](
+                {'WARNING'},
+                pre_line +
+                "links_as_collectioninstance → Experimental!"
+            )
+            if (
+                obj_label in self.link_targets.children
+                and obj_label in bpy.data.objects
+                # or get_obj_link_target_label(obj) in bpy.data.objects
+            ):
+                print(
+                    pre_line + "found link target object '{}'"
+                    "".format(obj_label)
+                )
+                bobj_link_target = bpy.data.objects[obj_label]
+                bobj_link_target_label = self.fix_link_target_name(
+                    bobj_link_target)
+                print(
+                    pre_line + "fixed name. '{}'"
+                    "".format(bobj_link_target)
+                )
+                # self.add_or_update_link_target(
+                #     func_data=func_data,
+                #     obj=obj,
+                #     obj_linked=obj_linkedobj,
+                #     obj_linkedobj_label=bobj_link_target_label,
+                # )
+                self.add_or_update_collection_instance(
+                    func_data=func_data,
+                    obj=obj,
+                    obj_label=obj_label,
+                    # instance_target_label=bobj_link_target_label,
+                    instance_target_label=obj_label,
+                )
+
+                # obj_linkedobj = None
+                # self.handle__AppLinkElement(func_data, obj_linkedobj)
+
+            else:
+                print(
+                    pre_line + "    "
+                    "obj_label '{}' not found in link_targets. "
+                    "so we do a normal import.. "
+                    "".format(obj_label)
+                )
+                import_it = True
         else:
+            if obj_label in self.data.objects:
+                bobj_link_target = bpy.data.objects[obj_label]
+                bmesh = bobj_link_target.data
+                bobj = self.create_bobj_from_bmesh(func_data, bmesh)
+                func_data["bobj"] = bobj
+                func_data["update_tree"] = True
+            else:
+                import_it = True
+
+        if import_it:
             self.create_mesh_from_shape(func_data)
 
     # Mesh::Feature
