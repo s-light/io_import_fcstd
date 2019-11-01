@@ -135,7 +135,7 @@ def test_filtering():
     print("test_filtered", test_filtered)
 
 
-def print_colored(mode, data):
+def print_colored(mode, data, pre_line=""):
     """Print with coloring similar to blenders info area."""
     printcolor = colors.reset
     if mode == {'INFO'}:
@@ -144,11 +144,11 @@ def print_colored(mode, data):
         printcolor = colors.fg.orange
     elif mode == {'ERROR'}:
         printcolor = colors.fg.red
-    print("{}{}{}".format(printcolor, data, colors.reset))
+    print("{}{}{}{}".format(str(pre_line), printcolor, data, colors.reset))
 
 
 # https://blender.stackexchange.com/a/142317/16634
-def print_blender_console(mode, data):
+def print_blender_console(mode, data, pre_line=""):
     """Print to blenders console area."""
     if bpy:
         message_type = mode.pop()
@@ -159,6 +159,7 @@ def print_blender_console(mode, data):
         else:
             message_type = 'INFO'
         data = filter_ASCII_controlls(str(data))
+        data = filter_ASCII_controlls(str(pre_line)) + data
         for window in bpy.context.window_manager.windows:
             screen = window.screen
             for area in screen.areas:
@@ -172,20 +173,25 @@ def print_blender_console(mode, data):
                         override, text=data, type=message_type)
 
 
-def print_console(mode, data):
+def print_console(mode, data, pre_line=""):
     """Multi-Print to blenders console area and system console."""
-    print_colored(mode, data)
-    print_blender_console(mode, data)
+    print_colored(mode, data, pre_line=pre_line)
+    print_blender_console(mode, data, pre_line=pre_line)
 
 
-def print_multi(mode, data, report=None):
+def print_multi(*, mode, data, pre_line="", report=None):
     """Multi-Print to blenders console or info area and system console."""
-    print_colored(mode, data)
+    # print(
+    #     "print_multi   "
+    #     "mode:'{}' pre_line:'{}'  data:'{}'"
+    #     "".format(mode, pre_line,  data)
+    # )
+    print_colored(mode, data, pre_line)
     if report:
         data = filter_ASCII_controlls(str(data))
         report(mode, data)
     else:
-        print_blender_console(mode, data)
+        print_blender_console(mode, data, pre_line)
 
 
 # def print_blender_info(mode, data):

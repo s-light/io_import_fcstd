@@ -6,7 +6,7 @@
 import sys
 import bpy
 import os
-import pprint
+# import pprint
 
 from .. import freecad_helper as fc_helper
 from .. import blender_helper as b_helper
@@ -76,14 +76,18 @@ class ImportFcstd(object):
         if self.config['filter_sketch']:
             self.typeid_filter_list.append('Sketcher::SketchObject')
 
-    def print_report(self, mode, data):
+    def print_report(self, mode, data, pre_line=""):
         """Multi print handling."""
-        b_helper.print_multi(mode, data, self.report)
+        b_helper.print_multi(
+            mode=mode,
+            data=data,
+            pre_line=pre_line,
+            report=self.report,
+        )
 
     def print_obj(self, obj, pre_line="", post_line="", end="\n"):
         """Print object with nice formating."""
         message = (
-            pre_line +
             "'{}' ('{}' <{}>)"
             "".format(obj.Label, obj.Name, obj.TypeId)
             + post_line
@@ -91,7 +95,8 @@ class ImportFcstd(object):
         # print(message, end=end)
         self.config["report"](
             {'INFO'},
-            message
+            message,
+            pre_line
         )
 
     def handle_label_prefix(self, label):
@@ -183,6 +188,7 @@ class ImportFcstd(object):
 
     def handle_placement(
         self,
+        # pre_line,
         obj,
         bobj,
         enable_scale=True,
@@ -457,11 +463,11 @@ class ImportFcstd(object):
     def create_collection_instance(
         self,
         func_data,
+        pre_line,
         obj_label,
         base_collection
     ):
         """Create instance of given collection."""
-        pre_line = func_data["pre_line"]
         result_bobj = bpy.data.objects.new(
             name=obj_label,
             object_data=None
@@ -516,42 +522,56 @@ class ImportFcstd(object):
                 sub_objects,
                 include_only_visible=sub_filter_visible
             )
-            print(
+            # │─ ┌─ └─ ├─ ╞═ ╘═╒═
+            # ║═ ╔═ ╚═ ╠═ ╟─
+            # ┃━ ┏━ ┗━ ┣━ ┠─
+            pre_line_start = pre_line + "╔════ "
+            pre_line_sub = pre_line + "╠═ "
+            pre_line_follow = pre_line + "║   "
+            pre_line_end = pre_line + "╚════ "
+            self.config["report"]({'INFO'}, (
                 b_helper.colors.bold
                 + b_helper.colors.fg.purple
-                + pre_line
                 + "Import {} Recusive:".format(len(sub_objects))
                 + b_helper.colors.reset
-            )
+            ), pre_line=pre_line_start)
 
             for index, obj in enumerate(sub_objects):
-                self.print_obj(obj, pre_line + "- ")
                 if self.check_obj_visibility_with_skiphidden(
                     obj,
                     include_only_visible[index]
                 ):
+                    self.print_obj(obj, pre_line_sub)
                     self.import_obj(
                         obj=obj,
                         collection=func_data["collection"],
                         collection_parent=func_data["collection_parent"],
                         obj_parent=func_data["obj_parent"],
                         bobj_parent=func_data["bobj_parent"],
-                        pre_line=pre_line + "    "
+                        pre_line=pre_line_follow
                     )
                 else:
-                    print(
-                        b_helper.colors.fg.darkgrey
-                        + pre_line
-                        + "    "
-                        + "skipping - is hidden"
-                        + b_helper.colors.reset
+                    self.print_obj(
+                        obj=obj,
+                        pre_line=pre_line_sub,
+                        post_line=(
+                            b_helper.colors.fg.darkgrey
+                            + "  (skipping - hidden)"
+                            + b_helper.colors.reset
+                        )
                     )
-        else:
-            print(
-                b_helper.colors.fg.darkgrey
-                + pre_line + "→ no childs."
+            self.config["report"]({'INFO'}, (
+                b_helper.colors.bold
+                + b_helper.colors.fg.purple
+                + "done."
                 + b_helper.colors.reset
-            )
+            ), pre_line=pre_line_end)
+        else:
+            self.config["report"]({'INFO'}, (
+                b_helper.colors.fg.darkgrey
+                + "→ no childs."
+                + b_helper.colors.reset
+            ), pre_line=pre_line)
 
     # ##########################################
     # Arrays and similar
@@ -613,13 +633,24 @@ class ImportFcstd(object):
         instance_target_label,
     ):
         """Add or update collection instance object."""
-        pre_line = func_data["pre_line"]
+        pre_line_orig = func_data["pre_line"]
+        pre_line = pre_line_orig
+        # │─ ┌─ └─ ├─ ╞═ ╘═╒═
+        # ║═ ╔═ ╚═ ╠═ ╟─
+        # ┃━ ┏━ ┗━ ┣━ ┠─
+        pre_line_start = pre_line_orig + "┌ "
+        # pre_line_sub = pre_line_orig + "├─ "
+        pre_line_follow = pre_line_orig + "│   "
+        pre_line_end = pre_line_orig + "└────────── "
         print(
-            pre_line +
+            pre_line_start +
             "add_or_update_collection_instance '{}'"
             "".format(obj_label)
         )
-        pre_line = pre_line + ">  "
+        func_data["pre_line"] = pre_line_follow
+        # pre_line = pre_line_sub
+        pre_line = pre_line_follow
+
         print(pre_line + "obj_label '{}'".format(obj_label))
         print(pre_line + "instance_target_label '{}'".format(instance_target_label))
         print(
@@ -638,6 +669,7 @@ class ImportFcstd(object):
             else:
                 bobj = self.create_collection_instance(
                     func_data,
+                    pre_line_follow,
                     obj_label,
                     base_collection
                 )
@@ -649,20 +681,33 @@ class ImportFcstd(object):
             # )
             if self.config["update"] or flag_new:
                 self.set_obj_parent_and_collection(
-                    pre_line, func_data, bobj)
-                self.handle_placement(obj, bobj, enable_scale=False)
+                    pre_line_follow,
+                    func_data,
+                    bobj
+                )
+                self.handle_placement(
+                    # pre_line_follow,
+                    obj,
+                    bobj,
+                    enable_scale=False
+                )
                 # print(
                 #     pre_line + "    "
                 #     "bobj '{}' ".format(bobj.location)
                 # )
         else:
-            self.config["report"]({'WARNING'}, (
-                pre_line +
-                "Warning: can't add or update instance. "
-                "'{}' collection not found."
-                "".format(instance_target_label)
-            ))
-            return False
+            self.config["report"](
+                {'WARNING'},
+                (
+                    "Warning: can't add or update instance. "
+                    "'{}' collection not found."
+                    "".format(instance_target_label)
+                ),
+                pre_line
+            )
+            # return False
+        print(pre_line_end + "")
+        func_data["pre_line"] = pre_line_orig
 
     def add_or_update_link_target(
         self,
@@ -702,10 +747,9 @@ class ImportFcstd(object):
             )
             # if obj_linkedobj_label in bpy.data.objects:
             #     self.config["report"]({'INFO'}, (
-            #         pre_line +
             #         "skipping import. '{}' already in objects list."
             #         "".format(obj_linkedobj_label)
-            #     ))
+            #     ), pre_line)
             # else:
             func_data_obj_linked = self.import_obj(
                 obj=obj_linkedobj,
@@ -787,21 +831,32 @@ class ImportFcstd(object):
 
     def handle__AppLink(self, func_data):
         """Handle App::Link objects."""
-        print(func_data["pre_line"] + "handle__AppLink:")
-        func_data["pre_line"] += "* "
-        pre_line = func_data["pre_line"]
+        pre_line_orig = func_data["pre_line"]
+        pre_line = pre_line_orig
+        # │─ ┌─ └─ ├─ ╞═ ╘═╒═
+        # ║═ ╔═ ╚═ ╠═ ╟─
+        # ┃━ ┏━ ┗━ ┣━ ┠─
+        pre_line_start = pre_line_orig + "┌ "
+        # pre_line_sub = pre_line_orig + "├─ "
+        pre_line_follow = pre_line_orig + "│   "
+        pre_line_end = pre_line_orig + "└────────── "
+        print(
+            pre_line_start +
+            "handle__AppLink"
+        )
+        func_data["pre_line"] = pre_line_follow
+        # pre_line = pre_line_sub
+        pre_line = pre_line_follow
 
         obj = func_data["obj"]
         obj_linkedobj = func_data["obj"].LinkedObject
-        self.config["report"]({'WARNING'}, (
-            pre_line +
-            "'{}' ('{}') of type '{}': "
-            "".format(obj.Label, obj.Name, obj.TypeId)
-        ))
-        self.config["report"]({'WARNING'}, (
-            pre_line +
-            "  Warning: App::Link handling is highly experimental!!"
-        ))
+        # self.config["report"]({'WARNING'}, (
+        #     "'{}' ('{s}') of type '{}': "
+        #     "".format(obj.Label, obj.Name, obj.TypeId)
+        # ), pre_line)
+        # self.config["report"]({'WARNING'}, (
+        #     "  Warning: App::Link handling is highly experimental!!"
+        # ), pre_line)
         obj_label = self.get_obj_label(obj)
         # obj_linkedobj_label = self.get_obj_linkedobj_label(obj)
         # obj_linked_label = self.get_obj_label(obj_linkedobj)
@@ -829,17 +884,30 @@ class ImportFcstd(object):
                 self.handle__AppLinkElement(func_data)
         else:
             self.config["report"]({'WARNING'}, (
-                pre_line +
                 "Warning: '{}' LinkedObject is NONE → skipping."
                 "".format(obj_label)
-            ))
-        print(pre_line + "handle__AppLink   DONE")
+            ), pre_line)
+        print(pre_line_end + "")
+        func_data["pre_line"] = pre_line_orig
 
     def handle__AppLinkElement(self, func_data, obj_linkedobj=None):
         """Handle App::LinkElement objects."""
-        print(func_data["pre_line"] + "handle__AppLinkElement:")
-        func_data["pre_line"] += "| "
-        pre_line = func_data["pre_line"]
+        pre_line_orig = func_data["pre_line"]
+        pre_line = pre_line_orig
+        # │─ ┌─ └─ ├─ ╞═ ╘═╒═
+        # ║═ ╔═ ╚═ ╠═ ╟─
+        # ┃━ ┏━ ┗━ ┣━ ┠─
+        pre_line_start = pre_line_orig + "┌ "
+        # pre_line_sub = pre_line_orig + "├─ "
+        pre_line_follow = pre_line_orig + "│   "
+        pre_line_end = pre_line_orig + "└────────── "
+        print(
+            pre_line_start +
+            "handle__AppLinkElement"
+        )
+        func_data["pre_line"] = pre_line_follow
+        # pre_line = pre_line_sub
+        pre_line = pre_line_follow
 
         obj = func_data["obj"]
         if obj_linkedobj is None:
@@ -851,11 +919,10 @@ class ImportFcstd(object):
         # obj_parent = obj.InList[0]
         obj_parent = func_data["obj_parent"]
         # self.config["report"]({'ERROR'}, (
-        #     pre_line +
         #     "'{}' ('{}') of type '{}': "
         #     "ERROR: handle__AppLinkElement EXPERIMENTAL!"
         #     "".format(obj.Label, obj.Name, obj.TypeId)
-        # ))
+        # ), pre_line)
 
         # obj_parent_label = self.get_obj_label(obj_parent)
         obj_label = self.get_obj_combined_label(obj_parent, obj)
@@ -889,7 +956,8 @@ class ImportFcstd(object):
             obj_label=obj_label,
             instance_target_label=obj_linkedobj_label,
         )
-        print(pre_line + "handle__AppLinkElement   DONE")
+        print(pre_line_end + "")
+        func_data["pre_line"] = pre_line_orig
 
     # ##########################################
     # 'real' object types
@@ -1000,34 +1068,33 @@ class ImportFcstd(object):
 
     def handle__PartFeature(self, func_data):
         """Handle Part::Feature objects."""
-        print(func_data["pre_line"] + "handle__PartFeature:")
-        pre_line = func_data["pre_line"]
+        # pre_line = func_data["pre_line"]
+        # print(func_data["pre_line"] + "handle__PartFeature")
+        # pre_line += "  > "
         obj = func_data["obj"]
         obj_label = self.get_obj_label(obj)
         import_it = False
         # check if this Part::Feature object is already imported.
         if self.config["links_as_collectioninstance"]:
-            self.config["report"](
-                {'WARNING'},
-                pre_line +
-                "links_as_collectioninstance → Experimental!"
-            )
+            # self.config["report"]({'WARNING'},(
+            #     "links_as_collectioninstance → Experimental!"
+            # ), pre_line)
             if (
                 obj_label in self.link_targets.children
                 and obj_label in bpy.data.objects
                 # or get_obj_link_target_label(obj) in bpy.data.objects
             ):
-                print(
-                    pre_line + "found link target object '{}'"
-                    "".format(obj_label)
-                )
+                # print(
+                #     pre_line + "found link target object '{}'"
+                #     "".format(obj_label)
+                # )
                 bobj_link_target = bpy.data.objects[obj_label]
-                bobj_link_target_label = self.fix_link_target_name(
-                    bobj_link_target)
-                print(
-                    pre_line + "fixed name. '{}'"
-                    "".format(bobj_link_target)
-                )
+                # bobj_link_target_label = self.fix_link_target_name(
+                self.fix_link_target_name(bobj_link_target)
+                # print(
+                #     pre_line + "fixed name. '{}'"
+                #     "".format(bobj_link_target)
+                # )
                 # self.add_or_update_link_target(
                 #     func_data=func_data,
                 #     obj=obj,
@@ -1046,17 +1113,17 @@ class ImportFcstd(object):
                 # self.handle__AppLinkElement(func_data, obj_linkedobj)
 
             else:
-                print(
-                    pre_line + "    "
-                    "obj_label '{}' not found in link_targets. "
-                    "so we do a normal import.. "
-                    "".format(obj_label)
-                )
+                # print(
+                #     pre_line + "    "
+                #     "obj_label '{}' not found in link_targets. "
+                #     "so we do a normal import.. "
+                #     "".format(obj_label)
+                # )
                 import_it = True
         else:
             if obj_label in self.data.objects:
-                bobj_link_target = bpy.data.objects[obj_label]
-                bmesh = bobj_link_target.data
+                bobj_target = bpy.data.objects[obj_label]
+                bmesh = bobj_target.data
                 bobj = self.create_bobj_from_bmesh(func_data, bmesh)
                 func_data["bobj"] = bobj
                 func_data["update_tree"] = True
@@ -1138,11 +1205,10 @@ class ImportFcstd(object):
                 self.handle__AppLink(func_data)
             else:
                 self.config["report"]({'WARNING'}, (
-                    pre_line +
                     "Unable to load '{}' ('{}') of type '{}'. "
                     "(Type Not implemented yet)."
                     "".format(obj.Label, obj.Name, obj.TypeId)
-                ))
+                ), pre_line)
 
             if (
                 func_data["verts"]
@@ -1158,6 +1224,7 @@ class ImportFcstd(object):
 
     def import_doc_content(self, doc):
         """Import document content = filterd objects."""
+        pre_line = ""
         obj_list = fc_helper.get_root_objects(
             doc,
             filter_list=self.typeid_filter_list
@@ -1167,27 +1234,49 @@ class ImportFcstd(object):
         self.config["report"]({'INFO'}, (
             "found {} root objects in '{}'"
             "".format(len(obj_list), self.doc_filename)
-        ))
+        ), pre_line=pre_line)
         fc_helper.print_objects(
             obj_list,
             show_lists=True,
             show_list_details=True
         )
         print("-"*21)
-        self.config["report"]({'INFO'}, "Import:")
+        # │─ ┌─ └─ ├─ ╞═ ╘═╒═
+        # ║═ ╔═ ╚═ ╠═ ╟─
+        # ┃━ ┏━ ┗━ ┣━ ┠─
+        pre_line_start = pre_line + "┏━━━━ "
+        pre_line_sub = pre_line + "┣━ "
+        pre_line_follow = pre_line + "┃    "
+        pre_line_end = pre_line + "┗━━━━ "
+        self.config["report"](
+            {'INFO'},
+            "Import",
+            pre_line=pre_line_start
+        )
         for obj in obj_list:
             if self.check_obj_visibility_with_skiphidden(obj):
-                self.print_obj(obj, pre_line="- ")
+                self.print_obj(obj, pre_line=pre_line_sub)
                 self.import_obj(
                     obj=obj,
                     collection=self.fcstd_collection,
                     bobj_parent=self.fcstd_empty,
-                    pre_line="    ",
+                    pre_line=pre_line_follow,
                 )
             else:
-                pre = b_helper.colors.fg.darkgrey + "- "
-                post = " (hidden)" + b_helper.colors.reset
-                self.print_obj(obj, pre_line=pre, post_line=post)
+                self.print_obj(
+                    obj=obj,
+                    pre_line=pre_line_sub,
+                    post_line=(
+                        b_helper.colors.fg.darkgrey
+                        + "  (skipping - hidden)"
+                        + b_helper.colors.reset
+                    )
+                )
+        self.config["report"](
+            {'INFO'},
+            "finished.",
+            pre_line=pre_line_end
+        )
 
     def prepare_collection(self):
         """Prepare main import collection."""
