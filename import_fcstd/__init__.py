@@ -468,23 +468,9 @@ class ImportFcstd(object):
             pre_line +
             "handle__object_with_sub_objects '{}'".format(parent_label)
         )
-        # print(
-        #     pre_line +
-        #     "include_only_visible '{}'".format(include_only_visible)
-        # )
         # pre_line += "→ "
-        # self.sub_collection_add_or_update(func_data, parent_label)
         self.parent_empty_add_or_update(func_data, parent_label)
         if len(sub_objects) > 0:
-            print(
-                pre_line +
-                "→  len(sub_objects) '{}'".format(len(sub_objects))
-            )
-            # print(
-            #     pre_line +
-            #     "→  include_only_visible '{}'".format(include_only_visible)
-            # )
-
             sub_filter_visible = False
             if not isinstance(include_only_visible, list):
                 # convert True or False to list
@@ -510,14 +496,6 @@ class ImportFcstd(object):
 
             for index, obj in enumerate(sub_objects):
                 self.print_obj(obj, pre_line + "- ")
-                # TODO: find way to get real Visibility state.
-                # Issue: #10
-                # https://github.com/s-light/io_import_fcstd/issues/10
-                # print(
-                #     pre_line +
-                #     "include_only_visible[index] '{}'"
-                #     "".format(include_only_visible[index])
-                # )
                 if self.check_obj_visibility_with_skiphidden(
                     obj,
                     include_only_visible[index]
@@ -544,33 +522,21 @@ class ImportFcstd(object):
                 + pre_line + "→ no childs."
                 + b_helper.colors.reset
             )
-        # reset current collection
-        # func_data["collection"] = func_data["collection_parent"]
-        # func_data["collection_parent"] = None
 
     # ##########################################
     # Arrays and similar
     def handle__ObjectWithElementList(self, func_data):
         """Handle Part::Feature objects."""
-        pre_line = func_data["pre_line"]
-        # obj = func_data["obj"]
-        # self.config["report"]({'WARNING'}, (
+        # pre_line = func_data["pre_line"]
+        # print(
         #     pre_line +
-        #     "'{}' ('{}') of type '{}': "
-        #     "Warning: ElementList handling is highly experimental!!"
-        #     "".format(obj.Label, obj.Name, obj.TypeId)
-        # ))
+        #     "handle__ObjectWithElementList "
+        # )
         # fc_helper.print_objects(
         #     func_data["obj"].ElementList,
         #     pre_line=pre_line
         # )
         include_only_visible = [*func_data["obj"].VisibilityList]
-        print(
-            pre_line +
-            "handle__ObjectWithElementList "
-            "VisibilityList: '{}'"
-            "".format(include_only_visible)
-        )
         self.handle__object_with_sub_objects(
             func_data,
             func_data["obj"].ElementList,
@@ -641,56 +607,21 @@ class ImportFcstd(object):
             if obj_label in bpy.data.objects:
                 bobj = bpy.data.objects[obj_label]
             else:
-                # create a instance of the collection
                 bobj = self.create_collection_instance(
                     func_data,
                     obj_label,
                     base_collection
                 )
                 flag_new = True
-                # print(pre_line + "bobj", bobj)
-            print(
-                pre_line +
-                "bobj '{}'; new:{}"
-                "".format(bobj, flag_new)
-            )
-
+            # print(
+            #     pre_line +
+            #     "bobj '{}'; new:{}"
+            #     "".format(bobj, flag_new)
+            # )
             if self.config["update"] or flag_new:
-                print(
-                    pre_line +
-                    "update '{}' or flag_new '{}'"
-                    "".format(self.config["update"], flag_new)
-                )
                 self.set_obj_parent_and_collection(
                     pre_line, func_data, bobj)
-
-                print(pre_line + "handle positioning:")
-                print(
-                    pre_line + "    "
-                    "obj  '{}' ".format(obj.Placement.Base)
-                )
-                print(
-                    pre_line + "    "
-                    "bobj '{}' ".format(bobj.location)
-                )
-                print(pre_line + " -- " "apply obj:")
                 self.handle_placement(obj, bobj, enable_scale=False)
-                print(
-                    pre_line + "    "
-                    "bobj '{}' ".format(bobj.location)
-                )
-                # print(pre_line + " -- " "apply negative obj_linkedobj:")
-                # print(
-                #     pre_line + "    "
-                #     "obj_linkedobj '{}' ".format(obj_linkedobj.Placement.Base)
-                # )
-                # self.handle_placement(
-                #     obj_linkedobj,
-                #     bobj,
-                #     enable_scale=False,
-                #     relative=True,
-                #     negative=True
-                # )
                 # print(
                 #     pre_line + "    "
                 #     "bobj '{}' ".format(bobj.location)
@@ -763,22 +694,22 @@ class ImportFcstd(object):
             # this has no parent as we use only the raw obj.
             bobj.parent = None
             self.reset_placement_position(bobj)
-            print(
-                pre_line + "$ created bobj: ",
-                bobj
-            )
-            print(
-                pre_line + "$ bobj_parent: ",
-                func_data_obj_linked["bobj_parent"]
-            )
-            print(
-                pre_line + "$ collection: ",
-                func_data_obj_linked["collection"]
-            )
-            print(
-                pre_line + "$ collection_parent: ",
-                func_data_obj_linked["collection_parent"]
-            )
+            # print(
+            #     pre_line + "$ created bobj: ",
+            #     bobj
+            # )
+            # print(
+            #     pre_line + "$ bobj_parent: ",
+            #     func_data_obj_linked["bobj_parent"]
+            # )
+            # print(
+            #     pre_line + "$ collection: ",
+            #     func_data_obj_linked["collection"]
+            # )
+            # print(
+            #     pre_line + "$ collection_parent: ",
+            #     func_data_obj_linked["collection_parent"]
+            # )
 
             # created collection for new link target
             func_data_obj_linked["collection"] = self.link_targets
@@ -831,17 +762,17 @@ class ImportFcstd(object):
         # obj_linkedobj_label = self.get_obj_linkedobj_label(obj)
         # obj_linked_label = self.get_obj_label(obj_linkedobj)
 
-        print(pre_line + "obj_label:", obj_label)
+        # print(pre_line + "obj_label:", obj_label)
         # print(pre_line + "obj_linkedobj_label:", obj_linkedobj_label)
         # print(pre_line + "obj_linked_label:", obj_linked_label)
-        fc_helper.print_obj(
-            obj,
-            pre_line=pre_line + "obj          : ")
-        fc_helper.print_obj(
-            obj_linkedobj,
-            pre_line=pre_line + "obj_linkedobj: ")
-        if hasattr(obj_linkedobj, "LinkedObject"):
-            fc_helper.print_obj(obj_linkedobj.LinkedObject, pre_line=pre_line)
+        # fc_helper.print_obj(
+        #     obj,
+        #     pre_line=pre_line + "obj          : ")
+        # fc_helper.print_obj(
+        #     obj_linkedobj,
+        #     pre_line=pre_line + "obj_linkedobj: ")
+        # if hasattr(obj_linkedobj, "LinkedObject"):
+        #     fc_helper.print_obj(obj_linkedobj.LinkedObject, pre_line=pre_line)
 
         if obj_linkedobj:
             if len(obj.ElementList) > 0:
