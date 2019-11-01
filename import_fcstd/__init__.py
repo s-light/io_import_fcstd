@@ -61,6 +61,7 @@ class ImportFcstd(object):
         self.guidata = {}
 
         self.fcstd_collection = None
+        self.link_targets = None
         self.fcstd_empty = None
 
         self.typeid_filter_list = [
@@ -173,8 +174,6 @@ class ImportFcstd(object):
             # you get really strange results...
             # new_loc = obj.Placement.Base.multiply(self.config["scale"])
             if relative:
-                # print("new_loc", new_loc)
-                # print("!!! relative")
                 # print(
                 #     "x: {} + {} = {}"
                 #     "".format(
@@ -210,33 +209,53 @@ class ImportFcstd(object):
                     self.config["scale"]
                 )
 
-    def update_tree(self, func_data):
+    def reset_placement_position(self, bobj):
+        """Reset placement position."""
+        bobj.location.x = 0
+        bobj.location.y = 0
+        bobj.location.z = 0
+
+    def update_tree_collections(self, func_data):
         """Update object tree."""
         pre_line = func_data["pre_line"]
         bobj = func_data["bobj"]
-
-        add_to_collection = False
-        if self.config['update']:
-            if bobj.name not in func_data["collection"].objects:
-                add_to_collection = True
+        if func_data["collection"]:
+            add_to_collection = False
+            if self.config['update']:
+                if bobj.name not in func_data["collection"].objects:
+                    add_to_collection = True
+                else:
+                    print(
+                        pre_line +
+                        "'{}' already in collection '{}'"
+                        "".format(bobj.name, func_data["collection"])
+                    )
             else:
-                print(
-                    pre_line +
-                    "'{}' already in collection '{}'"
-                    "".format(bobj.name, func_data["collection"])
-                )
-        else:
-            add_to_collection = True
+                add_to_collection = True
 
-        if add_to_collection:
-            func_data["collection"].objects.link(bobj)
-            if bobj.parent is None:
-                bobj.parent = func_data["bobj_parent"]
+            if add_to_collection:
+                func_data["collection"].objects.link(bobj)
                 print(
                     pre_line +
-                    "'{}' set parent to '{}' "
-                    "".format(bobj, func_data["bobj_parent"])
+                    "'{}' add to '{}' "
+                    "".format(bobj, func_data["collection"])
                 )
+
+    def update_tree_parents(self, func_data):
+        """Update object tree."""
+        pre_line = func_data["pre_line"]
+        bobj = func_data["bobj"]
+        if (
+            bobj.parent is None
+            and func_data["bobj_parent"] is not None
+        ):
+            bobj.parent = func_data["bobj_parent"]
+            print(
+                pre_line +
+                "'{}' set parent to '{}' "
+                "".format(bobj, func_data["bobj_parent"])
+            )
+            # TODO: check 'update'
 
     def add_or_update_blender_obj(self, func_data):
         """Create or update object with mesh and material data."""
@@ -295,7 +314,6 @@ class ImportFcstd(object):
             "sub_collection_add_or_update: '{}'".format(collection_label)
         )
         temp_collection = None
-
         if self.config["update"]:
             if collection_label in bpy.data.collections:
                 temp_collection = bpy.data.collections[collection_label]
@@ -306,6 +324,14 @@ class ImportFcstd(object):
             # create new
             temp_collection = bpy.data.collections.new(collection_label)
             func_data["collection"].children.link(temp_collection)
+            print(
+                func_data["pre_line"] +
+                "'{}' add to '{}' "
+                "".format(
+                    func_data["bobj"],
+                    func_data["collection"],
+                )
+            )
         else:
             # bpy.context.scene.collection.children.link(self.fcstd_collection)
             pass
@@ -329,11 +355,11 @@ class ImportFcstd(object):
             collection = self.fcstd_collection
         if bobj.name not in collection.objects:
             collection.objects.link(bobj)
-            # print(
-            #     pre_line +
-            #     "'{}' add to '{}' "
-            #     "".format(bobj, collection)
-            # )
+            print(
+                pre_line +
+                "'{}' add to '{}' "
+                "".format(bobj, collection)
+            )
 
     def parent_empty_add_or_update(self, func_data, parent_label):
         """Parent Empty handle add or update."""
@@ -405,6 +431,7 @@ class ImportFcstd(object):
         base_collection
     ):
         """Create instance of given collection."""
+        pre_line = func_data["pre_line"]
         result_bobj = bpy.data.objects.new(
             name=obj_label,
             object_data=None
@@ -416,6 +443,11 @@ class ImportFcstd(object):
         # TODO: CHECK where to add this!
         if func_data["collection"]:
             func_data["collection"].objects.link(result_bobj)
+            print(
+                pre_line +
+                "'{}' add to '{}' "
+                "".format(result_bobj, func_data["collection"])
+            )
         # result_bobj.parent = func_data["bobj_parent"]
         # result_bobj.parent = obj_parent
         if result_bobj.name in bpy.context.scene.collection.objects:
@@ -647,22 +679,22 @@ class ImportFcstd(object):
                     pre_line + "    "
                     "bobj '{}' ".format(bobj.location)
                 )
-                print(pre_line + " -- " "apply negative obj_linkedobj:")
-                print(
-                    pre_line + "    "
-                    "obj_linkedobj '{}' ".format(obj_linkedobj.Placement.Base)
-                )
-                self.handle_placement(
-                    obj_linkedobj,
-                    bobj,
-                    enable_scale=False,
-                    relative=True,
-                    negative=True
-                )
-                print(
-                    pre_line + "    "
-                    "bobj '{}' ".format(bobj.location)
-                )
+                # print(pre_line + " -- " "apply negative obj_linkedobj:")
+                # print(
+                #     pre_line + "    "
+                #     "obj_linkedobj '{}' ".format(obj_linkedobj.Placement.Base)
+                # )
+                # self.handle_placement(
+                #     obj_linkedobj,
+                #     bobj,
+                #     enable_scale=False,
+                #     relative=True,
+                #     negative=True
+                # )
+                # print(
+                #     pre_line + "    "
+                #     "bobj '{}' ".format(bobj.location)
+                # )
         else:
             self.config["report"]({'WARNING'}, (
                 pre_line +
@@ -709,26 +741,28 @@ class ImportFcstd(object):
             # else:
             func_data_obj_linked = self.import_obj(
                 obj=obj_linked,
-                collection=func_data["collection"],
-                collection_parent=func_data["collection_parent"],
-                bobj_parent=func_data["bobj_parent"],
+                collection=None,
+                collection_parent=None,
+                bobj_parent=None,
                 pre_line=pre_line + '    '
             )
             bobj = func_data_obj_linked["bobj"]
 
             # fix parent linking
-            obj_parent = obj_linked.getParentGeoFeatureGroup()
-            parent_label = self.get_obj_label(obj_parent)
-            if parent_label:
-                bobj_parent = bpy.data.objects[parent_label]
-                if bobj_parent:
-                    bobj.parent = bobj_parent
-                    print(
-                        pre_line +
-                        "'{}' set parent to '{}' "
-                        "".format(bobj, bobj_parent)
-                    )
-
+            # obj_parent = obj_linked.getParentGeoFeatureGroup()
+            # parent_label = self.get_obj_label(obj_parent)
+            # if parent_label:
+            #     bobj_parent = bpy.data.objects[parent_label]
+            #     if bobj_parent:
+            #         bobj.parent = bobj_parent
+            #         print(
+            #             pre_line +
+            #             "'{}' set parent to '{}' "
+            #             "".format(bobj, bobj_parent)
+            #         )
+            # this has no parent as we use only the raw obj.
+            bobj.parent = None
+            self.reset_placement_position(bobj)
             print(
                 pre_line + "$ created bobj: ",
                 bobj
@@ -745,28 +779,36 @@ class ImportFcstd(object):
                 pre_line + "$ collection_parent: ",
                 func_data_obj_linked["collection_parent"]
             )
+
             # created collection for new link target
+            func_data_obj_linked["collection"] = self.link_targets
             self.sub_collection_add_or_update(
                 func_data_obj_linked, obj_linkedobj_label)
             # self.parent_empty_add_or_update(
             #     func_data_obj_linked, obj_linkedobj_label)
             # add new object to collection.
             func_data_obj_linked["collection"].objects.link(bobj)
+            print(
+                pre_line +
+                "'{}' add to '{}' "
+                "".format(bobj, func_data_obj_linked["collection"])
+            )
+
             # bobj.parent = func_data_obj_linked["bobj_parent"]
-            if func_data_obj_linked["collection"]:
-                base_collection = func_data_obj_linked["collection"]
-                print(
-                    pre_line + "$ base_collection: ",
-                    base_collection
-                )
-            if base_collection:
-                # hide this internal object.
-                # we use only the instances..
-                base_collection.hide_render = False
-                base_collection.hide_select = True
-                base_collection.hide_viewport = False
-            func_data["collection"] = func_data["collection_parent"]
-            func_data["collection_parent"] = None
+            # if func_data_obj_linked["collection"]:
+            #     base_collection = func_data_obj_linked["collection"]
+            #     print(
+            #         pre_line + "$ base_collection: ",
+            #         base_collection
+            #     )
+            # if base_collection:
+            #     # hide this internal object.
+            #     # we use only the instances..
+            #     base_collection.hide_render = False
+            #     base_collection.hide_select = True
+            #     base_collection.hide_viewport = False
+            # func_data["collection"] = func_data["collection_parent"]
+            # func_data["collection_parent"] = None
 
     def handle__AppLink(self, func_data):
         """Handle App::Link objects."""
@@ -1026,6 +1068,7 @@ class ImportFcstd(object):
             # to store reusable materials
             "matdatabase": {},
             # name: "Unnamed",
+            "link_targets": [],
             "collection": collection,
             "collection_parent": collection_parent,
             "obj_parent": obj_parent,
@@ -1067,7 +1110,8 @@ class ImportFcstd(object):
                 and (func_data["faces"] or func_data["edges"])
             ):
                 self.add_or_update_blender_obj(func_data)
-                self.update_tree(func_data)
+                self.update_tree_collections(func_data)
+                self.update_tree_parents(func_data)
         return func_data
 
     def import_doc_content(self, doc):
@@ -1105,12 +1149,32 @@ class ImportFcstd(object):
 
     def prepare_collection(self):
         """Prepare main import collection."""
+        link_targets_label = self.doc.Name + "__link_targets"
         if self.config["update"]:
             if self.doc_filename in bpy.data.collections:
                 self.fcstd_collection = bpy.data.collections[self.doc_filename]
+            if link_targets_label in bpy.data.collections:
+                self.link_targets = bpy.data.collections[link_targets_label]
+
         if not self.fcstd_collection:
             self.fcstd_collection = bpy.data.collections.new(self.doc_filename)
             bpy.context.scene.collection.children.link(self.fcstd_collection)
+
+        if not self.link_targets:
+            self.link_targets = bpy.data.collections.new(link_targets_label)
+            self.fcstd_collection.children.link(self.link_targets)
+            # hide this internal object.
+            # we use only the instances..
+            self.link_targets.hide_render = False
+            self.link_targets.hide_select = True
+            self.link_targets.hide_viewport = False
+            # exclude from all view layers
+            for lc in helper.find_layer_collection_in_scene(
+                collection_name=link_targets_label
+            ):
+                lc.exclude = True
+                # for debugging do not exclude..
+                lc.exclude = False
 
     def prepare_root_empty(self):
         """Prepare import file root empty."""
@@ -1188,8 +1252,8 @@ class ImportFcstd(object):
             except Exception as e:
                 print(e)
             docname = doc.Name
-            self.doc_filename = docname + ".FCStd"
             if doc:
+                self.doc_filename = doc.Name + ".FCStd"
                 self.config["report"](
                     {'INFO'},
                     "File '{}' successfully opened."
