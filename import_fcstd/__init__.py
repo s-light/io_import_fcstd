@@ -124,6 +124,10 @@ class ImportFcstd(object):
             self.config["obj_name_prefix"] + label
         return label
 
+    def fix_link_target_name(self, bobj):
+        """Fix name of link target object."""
+        bobj.name = bobj.name + "__lt"
+
     def check_obj_visibility(self, obj):
         """Check if obj is visible."""
         result = True
@@ -257,6 +261,22 @@ class ImportFcstd(object):
             )
             # TODO: check 'update'
 
+    def create_bobj_from_bmesh(self, func_data, bmesh):
+        """Create new object from bmesh."""
+        obj_label = self.get_obj_label(func_data["obj"])
+        bobj = bpy.data.objects.new(obj_label, bmesh)
+        self.handle_placement(func_data["obj"], bobj)
+        material_manager = MaterialManager(
+            guidata=self.guidata,
+            func_data=func_data,
+            bobj=bobj,
+            obj_label=obj_label,
+            sharemats=self.config["sharemats"]
+        )
+        material_manager.create_new()
+        func_data["bobj"] = bobj
+        return bobj
+
     def add_or_update_blender_obj(self, func_data):
         """Create or update object with mesh and material data."""
         pre_line = func_data["pre_line"]
@@ -290,21 +310,11 @@ class ImportFcstd(object):
             bobj.data = bmesh
             # self.handle_material_update(func_data, bobj)
         else:
-            # create new object
-            bobj = bpy.data.objects.new(obj_label, bmesh)
-            self.handle_placement(func_data["obj"], bobj)
-            # self.handle_material_new(func_data, bobj)
-            material_manager = MaterialManager(
-                guidata=self.guidata,
-                func_data=func_data,
-                bobj=bobj,
-                obj_label=self.get_obj_label(func_data["obj"]),
-                sharemats=self.config["sharemats"]
+            bobj = self.create_bobj_from_bmesh(
+                func_data,
+                bmesh
             )
-            material_manager.create_new()
 
-        # bpy.context.scene.objects.active = func_data["obj"]
-        # obj.select = True
         func_data["bobj"] = bobj
 
     def sub_collection_add_or_update(self, func_data, collection_label):
@@ -957,7 +967,18 @@ class ImportFcstd(object):
 
     def handle__PartFeature(self, func_data):
         """Handle Part::Feature objects."""
-        self.create_mesh_from_shape(func_data)
+        # pre_line = func_data["pre_line"]
+        obj_label = self.get_obj_label(func_data["obj"])
+        # check if this Part::Feature object is already imported.
+        if obj_label in self.link_targets.children:
+            bobj_link_target = bpy.data.objects[obj_label]
+            self.fix_link_target_name(bobj_link_target)
+            bmesh = bobj_link_target.data
+            bobj = self.create_bobj_from_bmesh(func_data, bmesh)
+            func_data["bobj"] = bobj
+            func_data["update_tree"] = True
+        else:
+            self.create_mesh_from_shape(func_data)
 
     # Mesh::Feature
     def handle__MeshFeature(self, func_data):
@@ -1005,6 +1026,7 @@ class ImportFcstd(object):
             "obj_parent": obj_parent,
             "bobj_parent": bobj_parent,
             "pre_line": pre_line,
+            "update_tree": False,
         }
         # func_data["matindex"]
         if obj:
@@ -1041,6 +1063,9 @@ class ImportFcstd(object):
                 and (func_data["faces"] or func_data["edges"])
             ):
                 self.add_or_update_blender_obj(func_data)
+                func_data["update_tree"] = True
+
+            if func_data["update_tree"]:
                 self.update_tree_collections(func_data)
                 self.update_tree_parents(func_data)
         return func_data
