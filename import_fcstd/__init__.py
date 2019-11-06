@@ -191,6 +191,7 @@ class ImportFcstd(object):
         # pre_line,
         obj,
         bobj,
+        enable_import_scale=True,
         enable_scale=True,
         relative=False,
         negative=False,
@@ -232,12 +233,15 @@ class ImportFcstd(object):
                 )
                 bobj.rotation_quaternion = (q)
                 bobj.rotation_mode = m
-            if enable_scale:
+            if enable_import_scale:
                 bobj.scale = (
                     self.config["scale"],
                     self.config["scale"],
                     self.config["scale"]
                 )
+            if enable_scale and ("Scale" in obj.PropertiesList):
+                # object has Scale property so lets use it :-)
+                bobj.scale = bobj.scale * obj.Scale
 
     def reset_placement_position(self, bobj):
         """Reset placement position."""
@@ -445,7 +449,7 @@ class ImportFcstd(object):
                 self.handle_placement(
                     obj,
                     parent_empty,
-                    enable_scale=False,
+                    enable_import_scale=False,
                 )
                 # print(
                 #     pre_line +
@@ -689,7 +693,8 @@ class ImportFcstd(object):
                     # pre_line_follow,
                     obj,
                     bobj,
-                    enable_scale=False
+                    enable_import_scale=False,
+                    enable_scale=True
                 )
                 # print(
                 #     pre_line + "    "
@@ -1304,8 +1309,6 @@ class ImportFcstd(object):
                 collection_name=link_targets_label
             ):
                 lc.exclude = True
-                # for debugging do not exclude..
-                lc.exclude = False
 
     def prepare_root_empty(self):
         """Prepare import file root empty."""
