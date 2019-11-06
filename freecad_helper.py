@@ -42,14 +42,15 @@ def print_obj_header(
     print()
 
 
-def print_obj(
+def format_obj(
     obj,
     pre_line="",
     show_lists=False,
     show_list_details=False,
-    end="\n",
+    tight_format=False
 ):
     """Print object nicely formated."""
+    result = ""
     obj_label = "NONE"
     if obj:
         obj_label = obj.Label
@@ -59,31 +60,31 @@ def print_obj(
     obj_type = "NONE"
     if obj:
         obj_type = obj.TypeId
-    print(
+    obj_format = "{:<25} {:<15} {:<25}"
+    if tight_format:
+        obj_format = "'{}' ('{}' <{}>)"
+    result += (
         pre_line +
-        "{:<25} {:<15} {:<25}"
-        "".format(obj_label, obj_name, obj_type),
-        end=''
+        obj_format.format(obj_label, obj_name, obj_type)
     )
     if show_lists:
         group_count = '_'
         if hasattr(obj, 'Group'):
             group_count = len(obj.Group)
-        print(
+        result += (
             "{:>2} {:>2} {:>2} {:>2}"
             "".format(
                 len(obj.Parents),
                 len(obj.InList),
                 len(obj.OutList),
                 group_count
-            ),
-            end=''
+            )
         )
         if show_list_details:
             group = None
             if hasattr(obj, 'Group'):
                 group = obj.Group
-            print(
+            result += (
                 (
                     "    {:<10}" * 4
                 ).format(
@@ -91,10 +92,27 @@ def print_obj(
                     str(obj.InList),
                     str(obj.OutList),
                     str(group)
-                ),
-                end=''
+                )
             )
-    print("", end=end)
+    return result
+
+
+def print_obj(
+    obj,
+    pre_line="",
+    show_lists=False,
+    show_list_details=False,
+    end="\n",
+):
+    print(
+        format_obj(
+            obj=obj,
+            pre_line=pre_line,
+            show_lists=show_lists,
+            show_list_details=show_list_details,
+        ),
+        end=end
+    )
 
 
 def print_objects(

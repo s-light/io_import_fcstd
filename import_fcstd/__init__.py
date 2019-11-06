@@ -87,11 +87,16 @@ class ImportFcstd(object):
 
     def print_obj(self, obj, pre_line="", post_line="", end="\n"):
         """Print object with nice formating."""
-        message = (
-            "'{}' ('{}' <{}>)"
-            "".format(obj.Label, obj.Name, obj.TypeId)
-            + post_line
+        message = ""
+
+        message = fc_helper.format_obj(
+            obj=obj,
+            pre_line="",
+            show_lists=False,
+            show_list_details=False,
+            tight_format=True,
         )
+        message += post_line
         # print(message, end=end)
         self.config["report"](
             {'INFO'},
@@ -140,10 +145,17 @@ class ImportFcstd(object):
 
     def get_obj_combined_label(self, parent_obj, obj):
         """Get object label with optional prefix."""
+        label = None
+        obj_label = "NONE"
+        parent_obj_label = "NONE"
+        if obj:
+            obj_label = obj.Label
+        if parent_obj:
+            parent_obj_label = obj.Label
         label = (
-            parent_obj.Label
+            parent_obj_label
             + "__"
-            + obj.Label
+            + obj_label
         )
         label = self.handle_label_prefix(label)
         return label
@@ -546,14 +558,17 @@ class ImportFcstd(object):
                     include_only_visible[index]
                 ):
                     self.print_obj(obj, pre_line_sub)
+                    func_data_new = self.create_func_data()
+                    func_data_new["obj"] = obj
+                    func_data_new["collection"] = func_data["collection"]
+                    func_data_new["collection_parent"] = func_data["collection_parent"]
+                    func_data_new["obj_parent"] = func_data["obj_parent"]
+                    func_data_new["bobj_parent"] = func_data["bobj_parent"]
                     self.import_obj(
-                        obj=obj,
-                        collection=func_data["collection"],
-                        collection_parent=func_data["collection_parent"],
-                        obj_parent=func_data["obj_parent"],
-                        bobj_parent=func_data["bobj_parent"],
-                        pre_line=pre_line_follow
+                        func_data=func_data_new,
+                        pre_line=pre_line_follow,
                     )
+
                 else:
                     self.print_obj(
                         obj=obj,
@@ -750,18 +765,26 @@ class ImportFcstd(object):
                     obj_linkedobj_label
                 )
             )
+            # self.print_obj(
+            #     obj_linkedobj,
+            #     pre_line=pre_line + "# ",
+            #     post_line=""
+            # )
             # if obj_linkedobj_label in bpy.data.objects:
             #     self.config["report"]({'INFO'}, (
             #         "skipping import. '{}' already in objects list."
             #         "".format(obj_linkedobj_label)
             #     ), pre_line)
             # else:
+            func_data_obj_linked = self.create_func_data()
+            func_data_obj_linked["obj"] = obj_linkedobj
+            func_data_obj_linked["collection"] = None
+            func_data_obj_linked["collection_parent"] = None
+            func_data_obj_linked["obj_parent"] = None
+            func_data_obj_linked["bobj_parent"] = None
             func_data_obj_linked = self.import_obj(
-                obj=obj_linkedobj,
-                collection=None,
-                collection_parent=None,
-                bobj_parent=None,
-                pre_line=pre_line + '    '
+                func_data=func_data_obj_linked,
+                pre_line=pre_line + '    ',
             )
             bobj = func_data_obj_linked["bobj"]
             # print(
@@ -915,12 +938,15 @@ class ImportFcstd(object):
         pre_line = pre_line_follow
 
         obj = func_data["obj"]
+
         if obj_linkedobj is None:
             obj_linkedobj = func_data["obj"].LinkedObject
-        if hasattr(obj_linkedobj, "LinkedObject"):
-            # if we have Arrays they  have a intermediet link object..
-            # we skip this..
-            obj_linkedobj = obj_linkedobj.LinkedObject
+
+        # if hasattr(obj_linkedobj, "LinkedObject"):
+        #     # if we have Arrays they  have a intermediet link object..
+        #     # we skip this..
+        #     obj_linkedobj = obj_linkedobj.LinkedObject
+
         # obj_parent = obj.InList[0]
         obj_parent = func_data["obj_parent"]
         # self.config["report"]({'ERROR'}, (
@@ -931,7 +957,8 @@ class ImportFcstd(object):
 
         # obj_parent_label = self.get_obj_label(obj_parent)
         obj_label = self.get_obj_combined_label(obj_parent, obj)
-        obj_linkedobj_label = self.get_obj_linkedobj_label(obj)
+        # obj_linkedobj_label = self.get_obj_linkedobj_label(obj)
+        obj_linkedobj_label = self.get_obj_label(obj_linkedobj)
 
         # print(pre_line + "collection:", func_data["collection"])
         # print(pre_line + "obj_parent_label:", obj_parent_label)
@@ -1073,9 +1100,9 @@ class ImportFcstd(object):
 
     def handle__PartFeature(self, func_data):
         """Handle Part::Feature objects."""
-        # pre_line = func_data["pre_line"]
-        # print(func_data["pre_line"] + "handle__PartFeature")
-        # pre_line += "  > "
+        pre_line = func_data["pre_line"]
+        print(func_data["pre_line"] + "handle__PartFeature")
+        pre_line += "  > "
         obj = func_data["obj"]
         obj_label = self.get_obj_label(obj)
         import_it = False
@@ -1151,24 +1178,10 @@ class ImportFcstd(object):
 
     # ##########################################
     # main object import
-    def import_obj(
-        self,
-        obj=None,
-        collection=None,
-        collection_parent=None,
-        obj_parent=None,
-        bobj_parent=None,
-        pre_line=""
-    ):
-        """Import Object."""
-        # import some FreeCAD modules needed below.
-        # After "import FreeCAD" these modules become available
-        # import Part
-        # import PartDesign
-        # print("import_obj: obj", obj)
-        # dict for storing all data
+    def create_func_data(self):
+        "Create a blank func_data structure."
         func_data = {
-            "obj": obj,
+            "obj": None,
             "bobj": None,
             "verts": [],
             "edges": [],
@@ -1179,41 +1192,93 @@ class ImportFcstd(object):
             "matdatabase": {},
             # name: "Unnamed",
             "link_targets": [],
-            "collection": collection,
-            "collection_parent": collection_parent,
-            "obj_parent": obj_parent,
-            "bobj_parent": bobj_parent,
-            "pre_line": pre_line,
+            "collection": None,
+            "collection_parent": None,
+            "obj_parent": None,
+            "bobj_parent": None,
+            "pre_line": "",
             "update_tree": False,
         }
+        return func_data
+
+    def _import_obj__handle_type(
+        self,
+        obj,
+        func_data,
+        pre_line=""
+    ):
+        """Choose Import Type."""
+        if (
+            obj.isDerivedFrom("Part::FeaturePython")
+            and hasattr(obj, 'ExpandArray')
+            and hasattr(obj, 'ElementList')
+        ):
+            self.handle__PartFeaturePython_Array(func_data)
+        elif obj.isDerivedFrom("Part::Feature"):
+            self.handle__PartFeature(func_data)
+        elif obj.isDerivedFrom("Mesh::Feature"):
+            self.handle__MeshFeature(func_data)
+        # elif obj.isDerivedFrom("PartDesign::Body"):
+        #     self.create_mesh_from_Body(func_data)
+        # elif obj.isDerivedFrom("XXXXXX"):
+        #     self.handle__XXXXXX(func_data)
+        elif obj.isDerivedFrom("App::Part"):
+            self.handle__AppPart(func_data)
+        elif obj.isDerivedFrom("App::LinkElement"):
+            self.handle__AppLinkElement(func_data)
+        elif obj.isDerivedFrom("App::Link"):
+            self.handle__AppLink(func_data)
+        else:
+            self.config["report"]({'WARNING'}, (
+                "Unable to load '{}' ('{}') of type '{}'. "
+                "(Type Not implemented yet)."
+                "".format(obj.Label, obj.Name, obj.TypeId)
+            ), pre_line)
+        return func_data
+
+    def import_obj(
+        self,
+        func_data=None,
+        # obj=None,
+        # collection=None,
+        # collection_parent=None,
+        # obj_parent=None,
+        # bobj_parent=None,
+        pre_line=""
+    ):
+        """Import Object."""
+        # import some FreeCAD modules needed below.
+        # After "import FreeCAD" these modules become available
+        # import Part
+        # import PartDesign
+        # print("import_obj: obj", obj)
+        # dict for storing all data
+        if not func_data:
+            func_data = self.create_func_data()
+        # func_data = {
+        #     "obj": obj,
+        #     "bobj": None,
+        #     "verts": [],
+        #     "edges": [],
+        #     "faces": [],
+        #     # face to material relationship
+        #     "matindex": [],
+        #     # to store reusable materials
+        #     "matdatabase": {},
+        #     # name: "Unnamed",
+        #     "link_targets": [],
+        #     "collection": collection,
+        #     "collection_parent": collection_parent,
+        #     "obj_parent": obj_parent,
+        #     "bobj_parent": bobj_parent,
+        #     "pre_line": pre_line,
+        #     "update_tree": False,
+        # }
         # func_data["matindex"]
+        func_data["pre_line"] = pre_line
+        obj = func_data["obj"]
         if obj:
-            if (
-                obj.isDerivedFrom("Part::FeaturePython")
-                and hasattr(obj, 'ExpandArray')
-                and hasattr(obj, 'ElementList')
-            ):
-                self.handle__PartFeaturePython_Array(func_data)
-            elif obj.isDerivedFrom("Part::Feature"):
-                self.handle__PartFeature(func_data)
-            elif obj.isDerivedFrom("Mesh::Feature"):
-                self.handle__MeshFeature(func_data)
-            # elif obj.isDerivedFrom("PartDesign::Body"):
-            #     self.create_mesh_from_Body(func_data)
-            # elif obj.isDerivedFrom("XXXXXX"):
-            #     self.handle__XXXXXX(func_data)
-            elif obj.isDerivedFrom("App::Part"):
-                self.handle__AppPart(func_data)
-            elif obj.isDerivedFrom("App::LinkElement"):
-                self.handle__AppLinkElement(func_data)
-            elif obj.isDerivedFrom("App::Link"):
-                self.handle__AppLink(func_data)
-            else:
-                self.config["report"]({'WARNING'}, (
-                    "Unable to load '{}' ('{}') of type '{}'. "
-                    "(Type Not implemented yet)."
-                    "".format(obj.Label, obj.Name, obj.TypeId)
-                ), pre_line)
+            self._import_obj__handle_type(obj, func_data, pre_line)
 
             if (
                 func_data["verts"]
@@ -1261,10 +1326,12 @@ class ImportFcstd(object):
         for obj in obj_list:
             if self.check_obj_visibility_with_skiphidden(obj):
                 self.print_obj(obj, pre_line=pre_line_sub)
+                func_data_new = self.create_func_data()
+                func_data_new["obj"] = obj
+                func_data_new["collection"] = self.fcstd_collection
+                func_data_new["bobj_parent"] = self.fcstd_empty
                 self.import_obj(
-                    obj=obj,
-                    collection=self.fcstd_collection,
-                    bobj_parent=self.fcstd_empty,
+                    func_data=func_data_new,
                     pre_line=pre_line_follow,
                 )
             else:
