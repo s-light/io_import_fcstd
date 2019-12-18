@@ -69,6 +69,8 @@ class ImportFcstd(object):
         self.link_targets = None
         self.fcstd_empty = None
 
+        self.imported_obj_names = []
+
         self.typeid_filter_list = [
             'GeoFeature',
             'PartDesign::CoordinateSystem',
@@ -210,7 +212,7 @@ class ImportFcstd(object):
     ):
         """Handle placement."""
         if self.config["placement"]:
-            # print ("placement:",placement)
+            print("handle_placement: '{}'".format(bobj.name))
             new_loc = (obj.Placement.Base * self.config["scale"])
             # attention: multiply does in-place change.
             # so if you call it multiple times on the same value
@@ -323,7 +325,6 @@ class ImportFcstd(object):
         """Create new object from bmesh."""
         obj_label = self.get_obj_label(func_data["obj"])
         bobj = bpy.data.objects.new(obj_label, bmesh)
-        self.handle_placement(func_data["obj"], bobj)
         material_manager = MaterialManager(
             guidata=self.guidata,
             func_data=func_data,
@@ -335,10 +336,11 @@ class ImportFcstd(object):
         func_data["bobj"] = bobj
         return bobj
 
-    def add_or_update_blender_obj(self, func_data, enable_import_scale=True):
+    def add_or_update_blender_obj(self, func_data):
         """Create or update object with mesh and material data."""
         pre_line = func_data["pre_line"]
         bobj = None
+        is_new = False
         obj_label = self.get_obj_label(func_data["obj"])
         if self.config["update"]:
             # locate existing object (object with same name)
@@ -371,7 +373,13 @@ class ImportFcstd(object):
                 func_data,
                 bmesh
             )
+            is_new = True
 
+        if self.config["update"] or is_new:
+            self.handle_placement(func_data["obj"], bobj)
+
+        if bobj.name not in self.imported_obj_names:
+            self.imported_obj_names.append(bobj.name)
         func_data["bobj"] = bobj
 
     def sub_collection_add_or_update(self, func_data, collection_label):
@@ -461,7 +469,10 @@ class ImportFcstd(object):
 
         flag_new = False
         if parent_empty is None:
-            print(pre_line + "create new parent_empty")
+            print(
+                pre_line +
+                "create new parent_empty '{}'".format(parent_label)
+            )
             parent_empty = bpy.data.objects.new(
                 name=parent_label,
                 object_data=None
@@ -590,15 +601,15 @@ class ImportFcstd(object):
                 + b_helper.colors.reset
             ), pre_line=pre_line_start)
 
-            self.print_obj(
-                obj=parent_obj,
-                pre_line=pre_line_follow + "parent_obj ",
-            )
-            print(
-                pre_line_follow +
-                "parent_bobj",
-                parent_bobj
-            )
+            # self.print_obj(
+            #     obj=parent_obj,
+            #     pre_line=pre_line_follow + "parent_obj ",
+            # )
+            # print(
+            #     pre_line_follow +
+            #     "parent_bobj",
+            #     parent_bobj
+            # )
 
             for index, obj in enumerate(sub_objects):
                 if self.check_obj_visibility_with_skiphidden(
@@ -805,11 +816,6 @@ class ImportFcstd(object):
 
         print(pre_line + "obj_label '{}'".format(obj_label))
         print(pre_line + "link_target_label '{}'".format(link_target_label))
-        print(
-            pre_line +
-            "func_data[collection] '{}'"
-            "".format(func_data["collection"])
-        )
 
         base_bobj = None
         bobj = None
@@ -847,6 +853,13 @@ class ImportFcstd(object):
                 #     pre_line + "    "
                 #     "bobj '{}' ".format(bobj.location)
                 # )
+                if bobj.data.name != link_target_label:
+                    print(pre_line + "update / relink to original link target")
+                    bobj.data = bpy.data.meshes[link_target_label]
+                # if obj_label in bpy.data.objects
+                # if obj_linkedobj_label in self.imported_obj_names:
+                #     print(pre_line + "Nothing to do. we have already imported/updated this.")
+
         else:
             self.config["report"](
                 {'WARNING'},
@@ -866,6 +879,7 @@ class ImportFcstd(object):
         *,
         func_data,
         obj,
+        obj_label,
         obj_linkedobj,
         obj_linkedobj_label,
     ):
@@ -887,8 +901,16 @@ class ImportFcstd(object):
         #         obj.getParentGeoFeatureGroup()
         #     )
         # )
-        if obj_linkedobj_label in bpy.data.objects:
-            print(pre_line + "TODO: implement update.")
+
+        if (
+            obj_linkedobj_label in bpy.data.objects
+            and (obj_linkedobj_label in self.imported_obj_names)
+        ):
+            print(
+                pre_line +
+                "Nothing to do. we have already imported/updated '{}'."
+                "".format(obj_linkedobj_label)
+            )
         else:
             self.print_obj(
                 obj,
@@ -972,22 +994,6 @@ class ImportFcstd(object):
                 "'{}' add to '{}' "
                 "".format(bobj, func_data_obj_linked["collection"])
             )
-
-            # bobj.parent = func_data_obj_linked["parent_bobj"]
-            # if func_data_obj_linked["collection"]:
-            #     base_collection = func_data_obj_linked["collection"]
-            #     print(
-            #         pre_line + "$ base_collection: ",
-            #         base_collection
-            #     )
-            # if base_collection:
-            #     # hide this internal object.
-            #     # we use only the instances..
-            #     base_collection.hide_render = False
-            #     base_collection.hide_select = True
-            #     base_collection.hide_viewport = False
-            # func_data["collection"] = func_data["collection_parent"]
-            # func_data["collection_parent"] = None
 
     def handle__AppLink(self, func_data):
         """Handle App::Link objects."""
@@ -1106,6 +1112,7 @@ class ImportFcstd(object):
         self.add_or_update_link_target(
             func_data=func_data,
             obj=obj,
+            obj_label=obj_label,
             obj_linkedobj=obj_linkedobj,
             obj_linkedobj_label=obj_linkedobj_label,
         )
@@ -1242,15 +1249,12 @@ class ImportFcstd(object):
         obj = func_data["obj"]
         obj_label = self.get_obj_label(obj)
         import_it = False
+        update_placement = False
         # check if this Part::Feature object is already imported.
         if self.config["links_as_collectioninstance"]:
-            # self.config["report"]({'WARNING'},(
-            #     "links_as_collectioninstance → Experimental!"
-            # ), pre_line)
             if (
                 obj_label in self.link_targets.children
                 and obj_label in bpy.data.objects
-                # or get_obj_link_target_label(obj) in bpy.data.objects
             ):
                 # print(
                 #     pre_line + "found link target object '{}'"
@@ -1276,31 +1280,32 @@ class ImportFcstd(object):
                     # instance_target_label=bobj_link_target_label,
                     instance_target_label=obj_label,
                 )
-
-                # obj_linkedobj = None
-                # self.handle__AppLinkElement(func_data, obj_linkedobj)
-
             else:
-                # print(
-                #     pre_line + "    "
-                #     "obj_label '{}' not found in link_targets. "
-                #     "so we do a normal import.. "
-                #     "".format(obj_label)
-                # )
                 import_it = True
         else:
             # handle creation of linked copies
-            if obj_label in bpy.data.objects:
-                bobj_target = bpy.data.objects[obj_label]
-                bmesh = bobj_target.data
-                bobj = self.create_bobj_from_bmesh(func_data, bmesh)
+            print(pre_line + "imported_obj_names:", self.imported_obj_names)
+            if (
+                obj_label in bpy.data.objects
+                and obj_label in self.imported_obj_names
+            ):
+                print(pre_line + "→ update bobj")
+                bobj = bpy.data.objects[obj_label]
                 func_data["bobj"] = bobj
+                update_placement = True
                 func_data["update_tree"] = True
             else:
+                print(pre_line + "→ just import it")
                 import_it = True
 
         if import_it:
             self.create_mesh_from_shape(func_data)
+
+        if update_placement:
+            self.handle_placement(
+                obj,
+                func_data["bobj"],
+            )
 
     # Mesh::Feature
     def handle__MeshFeature(self, func_data):
