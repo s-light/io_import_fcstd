@@ -430,11 +430,11 @@ class ImportFcstd(object):
             #     "'{}' already in objects list.".format(parent_label)
             # )
             if self.config["update"]:
-                    parent_empty = bpy.data.objects[parent_label]
-                    # print(
-                    #     pre_line +
-                    #     "update: '{}'".format(parent_empty)
-                    # )
+                parent_empty = bpy.data.objects[parent_label]
+                # print(
+                #     pre_line +
+                #     "update: '{}'".format(parent_empty)
+                # )
             else:
                 renamed_to = helper.rename_old_data(
                     bpy.data.objects, parent_label)
