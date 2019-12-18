@@ -171,6 +171,15 @@ def main_test():
     filename = os.path.realpath(filename)
     print("FreeCAD document to import:", filename)
 
+    print(
+        "purge '{}' unused data blocks."
+        "".format(import_fcstd.b_helper.purge_all_unused())
+    )
+    print(
+        "purge '{}' unused data blocks."
+        "".format(import_fcstd.b_helper.purge_all_unused())
+    )
+
     my_importer = import_fcstd.ImportFcstd(
         # update=True,
         # placement=True,

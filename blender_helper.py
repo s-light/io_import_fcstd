@@ -211,3 +211,30 @@ def print_multi(*, mode, data, pre_line="", report=None):
 #                     }
 #                     bpy.ops.console.scrollback_append(
 #                         override, text=data, type=message_type)
+
+def purge_all_unused():
+    """Remove all unused data blocks."""
+    counter = 0
+    # keep this order.
+    # as the lower things are contained in the higher ones..
+    for block in bpy.data.meshes:
+        if block.users == 0:
+            bpy.data.meshes.remove(block)
+            counter += 1
+
+    for block in bpy.data.materials:
+        if block.users == 0:
+            bpy.data.materials.remove(block)
+            counter += 1
+
+    for block in bpy.data.textures:
+        if block.users == 0:
+            bpy.data.textures.remove(block)
+            counter += 1
+
+    for block in bpy.data.images:
+        if block.users == 0:
+            bpy.data.images.remove(block)
+            counter += 1
+
+    return counter
