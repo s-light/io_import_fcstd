@@ -212,7 +212,7 @@ class ImportFcstd(object):
     ):
         """Handle placement."""
         if self.config["placement"]:
-            print("handle_placement: '{}'".format(bobj.name))
+            # print("handle_placement: '{}'".format(bobj.name))
             new_loc = (obj.Placement.Base * self.config["scale"])
             # attention: multiply does in-place change.
             # so if you call it multiple times on the same value
@@ -854,7 +854,11 @@ class ImportFcstd(object):
                 #     "bobj '{}' ".format(bobj.location)
                 # )
                 if bobj.data.name != link_target_label:
-                    print(pre_line + "update / relink to original link target")
+                    print(
+                        pre_line +
+                        "update / relink '{}' to original link target '{}'"
+                        "".format(obj_label, link_target_label)
+                    )
                     bobj.data = bpy.data.meshes[link_target_label]
                 # if obj_label in bpy.data.objects
                 # if obj_linkedobj_label in self.imported_obj_names:
