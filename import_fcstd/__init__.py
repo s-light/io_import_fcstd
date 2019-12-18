@@ -203,7 +203,7 @@ class ImportFcstd(object):
         # pre_line,
         obj,
         bobj,
-        enable_import_scale=True,
+        # enable_import_scale=False,
         enable_scale=True,
         relative=False,
         negative=False,
@@ -245,12 +245,6 @@ class ImportFcstd(object):
                 )
                 bobj.rotation_quaternion = (q)
                 bobj.rotation_mode = m
-            if enable_import_scale:
-                bobj.scale = (
-                    self.config["scale"],
-                    self.config["scale"],
-                    self.config["scale"]
-                )
             if enable_scale and ("Scale" in obj.PropertiesList):
                 # object has Scale property so lets use it :-)
                 bobj.scale = bobj.scale * obj.Scale
@@ -303,6 +297,28 @@ class ImportFcstd(object):
             )
             # TODO: check 'update'
 
+    def create_bmesh_from_func_data(
+        self,
+        func_data,
+        obj_label,
+        enable_import_scale=True
+    ):
+        """Create new object from bmesh."""
+        bmesh = bpy.data.meshes.new(name=obj_label)
+        bmesh.from_pydata(
+            func_data["verts"],
+            func_data["edges"],
+            func_data["faces"]
+        )
+        bmesh.update()
+        # handle import scalling
+        if enable_import_scale:
+            scale = self.config["scale"]
+            for v in bmesh.vertices:
+                v.co *= scale
+        bmesh.update()
+        return bmesh
+
     def create_bobj_from_bmesh(self, func_data, bmesh):
         """Create new object from bmesh."""
         obj_label = self.get_obj_label(func_data["obj"])
@@ -319,7 +335,7 @@ class ImportFcstd(object):
         func_data["bobj"] = bobj
         return bobj
 
-    def add_or_update_blender_obj(self, func_data):
+    def add_or_update_blender_obj(self, func_data, enable_import_scale=True):
         """Create or update object with mesh and material data."""
         pre_line = func_data["pre_line"]
         bobj = None
@@ -337,13 +353,12 @@ class ImportFcstd(object):
                 # this way the new mesh can get the original name.
                 helper.rename_old_data(bpy.data.meshes, obj_label)
 
-        bmesh = bpy.data.meshes.new(name=obj_label)
-        bmesh.from_pydata(
-            func_data["verts"],
-            func_data["edges"],
-            func_data["faces"]
+        bmesh = self.create_bmesh_from_func_data(
+            func_data,
+            obj_label,
+            enable_import_scale=True
         )
-        bmesh.update()
+
         if bobj:
             # update only the mesh of existing object.
             # copy old materials to new mesh:
@@ -461,7 +476,6 @@ class ImportFcstd(object):
                 self.handle_placement(
                     obj,
                     parent_empty,
-                    enable_import_scale=False,
                 )
                 # print(
                 #     pre_line +
@@ -505,6 +519,27 @@ class ImportFcstd(object):
         if result_bobj.name in bpy.context.scene.collection.objects:
             bpy.context.scene.collection.objects.unlink(result_bobj)
 
+        return result_bobj
+
+    def create_link_instance(
+        self,
+        func_data,
+        pre_line,
+        obj_label,
+        base_bobj
+    ):
+        """Create instance of given base_bobj."""
+        result_bobj = bpy.data.objects.new(
+            name=obj_label,
+            object_data=base_bobj.data
+        )
+        result_bobj.scale = base_bobj.scale
+        # check if we need to create link children...
+        if base_bobj.children:
+            self.config["report"]({'WARNING'}, (
+                "  Warning: create_link_instance "
+                "children handling not implemented yet!!"
+            ), pre_line)
         return result_bobj
 
     def handle__object_with_sub_objects(
@@ -708,7 +743,6 @@ class ImportFcstd(object):
                     # pre_line_follow,
                     obj,
                     bobj,
-                    enable_import_scale=False,
                     enable_scale=True
                 )
                 # print(
@@ -722,6 +756,91 @@ class ImportFcstd(object):
                     "Warning: can't add or update instance. "
                     "'{}' collection not found."
                     "".format(instance_target_label)
+                ),
+                pre_line
+            )
+            # return False
+        print(pre_line_end + "")
+        func_data["pre_line"] = pre_line_orig
+
+    def add_or_update_link_instance(
+        self,
+        *,
+        func_data,
+        obj,
+        obj_label,
+        link_target_label,
+    ):
+        """Add or update link instance object."""
+        pre_line_orig = func_data["pre_line"]
+        pre_line = pre_line_orig
+        # │─ ┌─ └─ ├─ ╞═ ╘═╒═
+        # ║═ ╔═ ╚═ ╠═ ╟─
+        # ┃━ ┏━ ┗━ ┣━ ┠─
+        pre_line_start = pre_line_orig + "┌ "
+        # pre_line_sub = pre_line_orig + "├─ "
+        pre_line_follow = pre_line_orig + "│   "
+        pre_line_end = pre_line_orig + "└────────── "
+        print(
+            pre_line_start +
+            "add_or_update_link_instance '{}'"
+            "".format(obj_label)
+        )
+        func_data["pre_line"] = pre_line_follow
+        # pre_line = pre_line_sub
+        pre_line = pre_line_follow
+
+        print(pre_line + "obj_label '{}'".format(obj_label))
+        print(pre_line + "link_target_label '{}'".format(link_target_label))
+        print(
+            pre_line +
+            "func_data[collection] '{}'"
+            "".format(func_data["collection"])
+        )
+
+        base_bobj = None
+        bobj = None
+        if link_target_label in bpy.data.objects:
+            base_bobj = bpy.data.objects[link_target_label]
+            flag_new = False
+            if obj_label in bpy.data.objects:
+                bobj = bpy.data.objects[obj_label]
+            else:
+                bobj = self.create_link_instance(
+                    func_data,
+                    pre_line_follow,
+                    obj_label,
+                    base_bobj
+                )
+                flag_new = True
+            # print(
+            #     pre_line +
+            #     "bobj '{}'; new:{}"
+            #     "".format(bobj, flag_new)
+            # )
+            if self.config["update"] or flag_new:
+                self.set_obj_parent_and_collection(
+                    pre_line_follow,
+                    func_data,
+                    bobj
+                )
+                self.handle_placement(
+                    # pre_line_follow,
+                    obj,
+                    bobj,
+                    enable_scale=True
+                )
+                # print(
+                #     pre_line + "    "
+                #     "bobj '{}' ".format(bobj.location)
+                # )
+        else:
+            self.config["report"](
+                {'WARNING'},
+                (
+                    "Warning: can't add or update linnk instance. "
+                    "'{}' link_target not found."
+                    "".format(link_target_label)
                 ),
                 pre_line
             )
@@ -982,12 +1101,20 @@ class ImportFcstd(object):
             obj_linkedobj_label=obj_linkedobj_label,
         )
 
-        self.add_or_update_collection_instance(
-            func_data=func_data,
-            obj=obj,
-            obj_label=obj_label,
-            instance_target_label=obj_linkedobj_label,
-        )
+        if self.config["links_as_collectioninstance"]:
+            self.add_or_update_collection_instance(
+                func_data=func_data,
+                obj=obj,
+                obj_label=obj_label,
+                instance_target_label=obj_linkedobj_label,
+            )
+        else:
+            self.add_or_update_link_instance(
+                func_data=func_data,
+                obj=obj,
+                obj_label=obj_label,
+                link_target_label=obj_linkedobj_label,
+            )
         print(pre_line_end + "")
         func_data["pre_line"] = pre_line_orig
 
@@ -1153,7 +1280,7 @@ class ImportFcstd(object):
                 # )
                 import_it = True
         else:
-            if obj_label in self.data.objects:
+            if obj_label in bpy.data.objects:
                 bobj_target = bpy.data.objects[obj_label]
                 bmesh = bobj_target.data
                 bobj = self.create_bobj_from_bmesh(func_data, bmesh)

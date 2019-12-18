@@ -182,7 +182,7 @@ def main_test():
         # update_materials=False,
         # obj_name_prefix="",
         # obj_name_prefix_with_filename=False,
-        # links_as_collectioninstance=True,
+        links_as_collectioninstance=False,
         path_to_freecad=path_to_freecad,
         # report=None
     )
