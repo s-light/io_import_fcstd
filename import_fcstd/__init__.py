@@ -151,7 +151,7 @@ class ImportFcstd(object):
         if obj:
             obj_label = obj.Label
         if parent_obj:
-            parent_obj_label = obj.Label
+            parent_obj_label = parent_obj.Label
         label = (
             parent_obj_label
             + "__"
@@ -287,13 +287,13 @@ class ImportFcstd(object):
         bobj = func_data["bobj"]
         if (
             bobj.parent is None
-            and func_data["bobj_parent"] is not None
+            and func_data["parent_bobj"] is not None
         ):
-            bobj.parent = func_data["bobj_parent"]
+            bobj.parent = func_data["parent_bobj"]
             print(
                 pre_line +
                 "'{}' set parent to '{}' "
-                "".format(bobj, func_data["bobj_parent"])
+                "".format(bobj, func_data["parent_bobj"])
             )
             # TODO: check 'update'
 
@@ -409,11 +409,11 @@ class ImportFcstd(object):
 
     def set_obj_parent_and_collection(self, pre_line, func_data, bobj):
         """Set Object parent and collection."""
-        bobj.parent = func_data["bobj_parent"]
+        bobj.parent = func_data["parent_bobj"]
         print(
             pre_line +
             "'{}' set parent to '{}' "
-            "".format(bobj, func_data["bobj_parent"])
+            "".format(bobj, func_data["parent_bobj"])
         )
 
         # add object to current collection
@@ -486,8 +486,8 @@ class ImportFcstd(object):
                 # )
 
         # update func_data links
-        func_data["obj_parent"] = obj
-        func_data["bobj_parent"] = parent_empty
+        func_data["parent_obj"] = obj
+        func_data["parent_bobj"] = parent_empty
         return parent_empty
 
     def create_collection_instance(
@@ -514,8 +514,8 @@ class ImportFcstd(object):
                 "'{}' add to '{}' "
                 "".format(result_bobj, func_data["collection"])
             )
-        # result_bobj.parent = func_data["bobj_parent"]
-        # result_bobj.parent = obj_parent
+        # result_bobj.parent = func_data["parent_bobj"]
+        # result_bobj.parent = parent_obj
         if result_bobj.name in bpy.context.scene.collection.objects:
             bpy.context.scene.collection.objects.unlink(result_bobj)
 
@@ -550,7 +550,9 @@ class ImportFcstd(object):
     ):
         """Handle sub objects."""
         pre_line = func_data["pre_line"]
-        parent_label = self.get_obj_label(func_data["obj"])
+        parent_obj = func_data["obj"]
+        parent_bobj = func_data["bobj"]
+        parent_label = self.get_obj_label(parent_obj)
         print(
             pre_line +
             "handle__object_with_sub_objects '{}'".format(parent_label)
@@ -597,8 +599,10 @@ class ImportFcstd(object):
                     func_data_new["obj"] = obj
                     func_data_new["collection"] = func_data["collection"]
                     func_data_new["collection_parent"] = func_data["collection_parent"]
-                    func_data_new["obj_parent"] = func_data["obj_parent"]
-                    func_data_new["bobj_parent"] = func_data["bobj_parent"]
+                    func_data_new["parent_obj"] = func_data["parent_obj"]
+                    func_data_new["parent_bobj"] = func_data["parent_bobj"]
+                    # func_data_new["parent_obj"] = parent_obj
+                    # func_data_new["parent_bobj"] = parent_bobj
                     self.import_obj(
                         func_data=func_data_new,
                         pre_line=pre_line_follow,
@@ -874,7 +878,7 @@ class ImportFcstd(object):
         #         obj.getParentGeoFeatureGroup()
         #     )
         # )
-        if obj_linkedobj_label in bpy.data.collections:
+        if obj_linkedobj_label in bpy.data.objects:
             print(pre_line + "TODO: implement update.")
         else:
             self.print_obj(
@@ -899,8 +903,8 @@ class ImportFcstd(object):
             func_data_obj_linked["obj"] = obj_linkedobj
             func_data_obj_linked["collection"] = None
             func_data_obj_linked["collection_parent"] = None
-            func_data_obj_linked["obj_parent"] = None
-            func_data_obj_linked["bobj_parent"] = None
+            func_data_obj_linked["parent_obj"] = None
+            func_data_obj_linked["parent_bobj"] = None
             func_data_obj_linked = self.import_obj(
                 func_data=func_data_obj_linked,
                 pre_line=pre_line + '    ',
@@ -914,16 +918,16 @@ class ImportFcstd(object):
             # pprint.pprint(func_data_obj_linked)
 
             # fix parent linking
-            # obj_parent = obj_linked.getParentGeoFeatureGroup()
-            # parent_label = self.get_obj_label(obj_parent)
+            # parent_obj = obj_linked.getParentGeoFeatureGroup()
+            # parent_label = self.get_obj_label(parent_obj)
             # if parent_label:
-            #     bobj_parent = bpy.data.objects[parent_label]
-            #     if bobj_parent:
-            #         bobj.parent = bobj_parent
+            #     parent_bobj = bpy.data.objects[parent_label]
+            #     if parent_bobj:
+            #         bobj.parent = parent_bobj
             #         print(
             #             pre_line +
             #             "'{}' set parent to '{}' "
-            #             "".format(bobj, bobj_parent)
+            #             "".format(bobj, parent_bobj)
             #         )
             # this has no parent as we use only the raw obj.
 
@@ -934,8 +938,8 @@ class ImportFcstd(object):
             #     bobj
             # )
             # print(
-            #     pre_line + "$ bobj_parent: ",
-            #     func_data_obj_linked["bobj_parent"]
+            #     pre_line + "$ parent_bobj: ",
+            #     func_data_obj_linked["parent_bobj"]
             # )
             # print(
             #     pre_line + "$ collection: ",
@@ -960,7 +964,7 @@ class ImportFcstd(object):
                 "".format(bobj, func_data_obj_linked["collection"])
             )
 
-            # bobj.parent = func_data_obj_linked["bobj_parent"]
+            # bobj.parent = func_data_obj_linked["parent_bobj"]
             # if func_data_obj_linked["collection"]:
             #     base_collection = func_data_obj_linked["collection"]
             #     print(
@@ -1037,7 +1041,7 @@ class ImportFcstd(object):
         print(pre_line_end + "")
         func_data["pre_line"] = pre_line_orig
 
-    def handle__AppLinkElement(self, func_data, obj_linkedobj=None):
+    def handle__AppLinkElement(self, func_data, obj_linkedobj=None, parent_is_list=False):
         """Handle App::LinkElement objects."""
         pre_line_orig = func_data["pre_line"]
         pre_line = pre_line_orig
@@ -1066,26 +1070,22 @@ class ImportFcstd(object):
         #     # we skip this..
         #     obj_linkedobj = obj_linkedobj.LinkedObject
 
-        # obj_parent = obj.InList[0]
-        obj_parent = func_data["obj_parent"]
-        # self.config["report"]({'ERROR'}, (
-        #     "'{}' ('{}') of type '{}': "
-        #     "ERROR: handle__AppLinkElement EXPERIMENTAL!"
-        #     "".format(obj.Label, obj.Name, obj.TypeId)
-        # ), pre_line)
+        # parent_obj = obj.InList[0]
+        parent_obj = func_data["parent_obj"]
 
-        # obj_parent_label = self.get_obj_label(obj_parent)
-        obj_label = self.get_obj_combined_label(obj_parent, obj)
+        # parent_obj_label = self.get_obj_label(parent_obj)
+        # obj_label = self.get_obj_combined_label(parent_obj, obj)
+        obj_label = self.get_obj_label(obj)
         # obj_linkedobj_label = self.get_obj_linkedobj_label(obj)
         obj_linkedobj_label = self.get_obj_label(obj_linkedobj)
 
         # print(pre_line + "collection:", func_data["collection"])
-        # print(pre_line + "obj_parent_label:", obj_parent_label)
+        # print(pre_line + "parent_obj_label:", parent_obj_label)
         print(pre_line + "obj_label:", obj_label)
         print(pre_line + "obj_linkedobj_label:", obj_linkedobj_label)
         fc_helper.print_obj(
-            obj_parent,
-            pre_line=pre_line + "obj_parent   : ")
+            parent_obj,
+            pre_line=pre_line + "parent_obj   : ")
         fc_helper.print_obj(
             obj,
             pre_line=pre_line + "obj          : ")
@@ -1280,6 +1280,7 @@ class ImportFcstd(object):
                 # )
                 import_it = True
         else:
+            # handle creation of linked copies
             if obj_label in bpy.data.objects:
                 bobj_target = bpy.data.objects[obj_label]
                 bmesh = bobj_target.data
@@ -1321,8 +1322,8 @@ class ImportFcstd(object):
             "link_targets": [],
             "collection": None,
             "collection_parent": None,
-            "obj_parent": None,
-            "bobj_parent": None,
+            "parent_obj": None,
+            "parent_bobj": None,
             "pre_line": "",
             "update_tree": False,
         }
@@ -1369,8 +1370,8 @@ class ImportFcstd(object):
         # obj=None,
         # collection=None,
         # collection_parent=None,
-        # obj_parent=None,
-        # bobj_parent=None,
+        # parent_obj=None,
+        # parent_bobj=None,
         pre_line=""
     ):
         """Import Object."""
@@ -1396,8 +1397,8 @@ class ImportFcstd(object):
         #     "link_targets": [],
         #     "collection": collection,
         #     "collection_parent": collection_parent,
-        #     "obj_parent": obj_parent,
-        #     "bobj_parent": bobj_parent,
+        #     "parent_obj": parent_obj,
+        #     "parent_bobj": parent_bobj,
         #     "pre_line": pre_line,
         #     "update_tree": False,
         # }
@@ -1456,7 +1457,7 @@ class ImportFcstd(object):
                 func_data_new = self.create_func_data()
                 func_data_new["obj"] = obj
                 func_data_new["collection"] = self.fcstd_collection
-                func_data_new["bobj_parent"] = self.fcstd_empty
+                func_data_new["parent_bobj"] = self.fcstd_empty
                 self.import_obj(
                     func_data=func_data_new,
                     pre_line=pre_line_follow,
@@ -1508,8 +1509,8 @@ class ImportFcstd(object):
         """Prepare import file root empty."""
         func_data = {
             "obj": None,
-            "obj_parent": None,
-            "bobj_parent": None,
+            "parent_obj": None,
+            "parent_bobj": None,
             "collection": self.fcstd_collection,
             "pre_line": "",
         }
