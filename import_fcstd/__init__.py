@@ -551,7 +551,6 @@ class ImportFcstd(object):
         """Handle sub objects."""
         pre_line = func_data["pre_line"]
         parent_obj = func_data["obj"]
-        parent_bobj = func_data["bobj"]
         parent_label = self.get_obj_label(parent_obj)
         print(
             pre_line +
@@ -559,6 +558,8 @@ class ImportFcstd(object):
         )
         # pre_line += "→ "
         self.parent_empty_add_or_update(func_data, parent_label)
+        parent_bobj = func_data["parent_bobj"]
+
         if len(sub_objects) > 0:
             sub_filter_visible = False
             if not isinstance(include_only_visible, list):
@@ -589,6 +590,16 @@ class ImportFcstd(object):
                 + b_helper.colors.reset
             ), pre_line=pre_line_start)
 
+            self.print_obj(
+                obj=parent_obj,
+                pre_line=pre_line_follow + "parent_obj ",
+            )
+            print(
+                pre_line_follow +
+                "parent_bobj",
+                parent_bobj
+            )
+
             for index, obj in enumerate(sub_objects):
                 if self.check_obj_visibility_with_skiphidden(
                     obj,
@@ -599,10 +610,8 @@ class ImportFcstd(object):
                     func_data_new["obj"] = obj
                     func_data_new["collection"] = func_data["collection"]
                     func_data_new["collection_parent"] = func_data["collection_parent"]
-                    func_data_new["parent_obj"] = func_data["parent_obj"]
-                    func_data_new["parent_bobj"] = func_data["parent_bobj"]
-                    # func_data_new["parent_obj"] = parent_obj
-                    # func_data_new["parent_bobj"] = parent_bobj
+                    func_data_new["parent_obj"] = parent_obj
+                    func_data_new["parent_bobj"] = parent_bobj
                     self.import_obj(
                         func_data=func_data_new,
                         pre_line=pre_line_follow,
