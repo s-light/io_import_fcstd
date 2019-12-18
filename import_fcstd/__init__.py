@@ -674,7 +674,7 @@ class ImportFcstd(object):
     # Part::FeaturePhython
     def handle__PartFeaturePython_Array(self, func_data):
         """Handle Part::Feature objects."""
-        # pre_line = func_data["pre_line"]
+        pre_line = func_data["pre_line"]
         # print(
         #     pre_line + "ElementList:",
         #     func_data["obj"].ElementList
@@ -686,10 +686,10 @@ class ImportFcstd(object):
         func_data["obj"].ExpandArray = True
         self.doc.recompute()
         # print(pre_line + "ExpandArray:", func_data["obj"].ExpandArray)
-        # print(
-        #     pre_line + "ElementList:",
-        #     func_data["obj"].ElementList
-        # )
+        print(
+            pre_line + "ElementList:",
+            func_data["obj"].ElementList
+        )
         self.handle__ObjectWithElementList(func_data)
 
     # App::Part
@@ -859,10 +859,15 @@ class ImportFcstd(object):
                         "update / relink '{}' to original link target '{}'"
                         "".format(obj_label, link_target_label)
                     )
-                    bobj.data = bpy.data.meshes[link_target_label]
-                # if obj_label in bpy.data.objects
-                # if obj_linkedobj_label in self.imported_obj_names:
-                #     print(pre_line + "Nothing to do. we have already imported/updated this.")
+                    if link_target_label in bpy.data.meshes:
+                        bobj.data = bpy.data.meshes[link_target_label]
+                    else:
+                        print(
+                            pre_line +
+                            "→ Something wired going on.... "
+                            "it seems to working..."
+                            "TODO: maybe CHECK"
+                        )
 
         else:
             self.config["report"](
@@ -906,9 +911,15 @@ class ImportFcstd(object):
         #     )
         # )
 
+        print(
+            pre_line +
+            "self.imported_obj_names ",
+            self.imported_obj_names
+        )
+
         if (
             obj_linkedobj_label in bpy.data.objects
-            and (obj_linkedobj_label in self.imported_obj_names)
+            or (obj_linkedobj_label in self.imported_obj_names)
         ):
             print(
                 pre_line +
