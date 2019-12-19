@@ -250,7 +250,7 @@ class ImportFcstd(object):
 
     def handle_placement(
         self,
-        # pre_line,
+        pre_line,
         obj,
         bobj,
         # enable_import_scale=False,
@@ -260,7 +260,9 @@ class ImportFcstd(object):
     ):
         """Handle placement."""
         if self.config["placement"]:
-            # print("handle_placement: '{}'".format(bobj.name))
+            print(pre_line)
+            print(pre_line + "   §§§   §§§   handle_placement: '{}'".format(bobj.name))
+            print(pre_line)
             new_loc = (obj.Placement.Base * self.config["scale"])
             # attention: multiply does in-place change.
             # so if you call it multiple times on the same value
@@ -496,11 +498,57 @@ class ImportFcstd(object):
 
         is_new, bobj = self.create_or_update_bobj(pre_line, func_data, obj_label, bmesh)
 
-        if (
-            (self.config["update"] or is_new)
-            # and not func_data["is_link"]
-        ):
-            self.handle_placement(func_data["obj"], bobj)
+        # TODO
+        if self.config["update"] or is_new:
+            print(pre_line + "placement...")
+            # self.handle_placement(
+            #     pre_line,
+            #     func_data["obj"],
+            #     bobj
+            # )
+            # if (
+            #     func_data["is_link"]
+            #     # and not func_data["obj"].isDerivedFrom("Part::Feature")
+            # ):
+            #     # self.handle_placement(
+            #     #     pre_line,
+            #     #     func_data["obj"],
+            #     #     bobj
+            #     # )
+
+            # if func_data["obj"].isDerivedFrom("Part::Feature"):
+            #     print(pre_line + "       obj isDerivedFrom Part::Feature")
+            # if func_data["obj"].isDerivedFrom("App::Part"):
+            #     print(pre_line + "       obj isDerivedFrom App::Part")
+            # if func_data["parent_obj"].isDerivedFrom("Part::Feature"):
+            #     print(pre_line + "parent_obj isDerivedFrom Part::Feature")
+            # if func_data["parent_obj"].isDerivedFrom("App::Part"):
+            #     print(pre_line + "parent_obj isDerivedFrom App::Part")
+
+            if func_data["is_link"]:
+                print(pre_line + "is link")
+                if (
+                    func_data["obj"].isDerivedFrom("Part::Feature")
+                    and func_data["parent_obj"].isDerivedFrom("App::Part")
+                ):
+                    print(
+                        pre_line +
+                        "is_link "
+                        "&& obj is Part::Feature "
+                        "&& parent_obj is App::Part "
+                    )
+                    self.handle_placement(
+                        pre_line,
+                        func_data["obj"],
+                        bobj
+                    )
+            else:
+                print(pre_line + "is not link")
+                self.handle_placement(
+                    pre_line,
+                    func_data["obj"],
+                    bobj
+                )
 
         if bobj.name not in self.imported_obj_names:
             self.imported_obj_names.append(bobj.name)
@@ -608,7 +656,7 @@ class ImportFcstd(object):
                 name=empty_label,
                 object_data=None
             )
-            empty_obj.empty_display_size = 0.01
+            empty_obj.empty_display_size = self.config["scale"] * 10
             self.set_obj_parent_and_collection(
                 pre_line, func_data, empty_obj)
 
@@ -616,13 +664,28 @@ class ImportFcstd(object):
             # set position of empty
             if obj:
                 self.handle_placement(
+                    pre_line,
                     obj,
                     empty_obj,
                 )
+                # NOT HERE.
+                # if not func_data["is_link"]:
+                #     self.handle_placement(
+                #         pre_line,
+                #         obj,
+                #         empty_obj,
+                #     )
+                #
                 # TODO: handle origin things corrrectly...
                 # origin_bobj
+                # getLinkedObject()
+                # >>> doc.Link006.getLinkedObject().Label
+                # 'Seagull_Double'
+                # >>> doc.Link003.getLinkedObject().Label
+                # 'Seagull_A1'
+                #
                 # if (
-                #     not func_data["origin_bobj"] empty_obj
+                #     not func_data["is_link"]
                 # ):
                 #     self.handle_placement(
                 #         obj,
@@ -655,7 +718,7 @@ class ImportFcstd(object):
         )
         result_bobj.instance_collection = base_collection
         result_bobj.instance_type = 'COLLECTION'
-        result_bobj.empty_display_size = 0.01
+        result_bobj.empty_display_size = self.config["scale"] * 10
 
         # TODO: CHECK where to add this!
         if func_data["collection"]:
@@ -677,22 +740,32 @@ class ImportFcstd(object):
         func_data,
         pre_line,
         obj_label,
-        base_bobj
+        link_target_bobj,
+        link_target_obj
     ):
-        """Create instance of given base_bobj."""
-        object_data = None
-        if base_bobj:
-            object_data = base_bobj.data
+        """Create instance of given link_target_bobj."""
+        result_bobj = None
+        if link_target_obj.isDerivedFrom("Part::Feature"):
+            object_data = None
+            if link_target_bobj:
+                object_data = link_target_bobj.data
+            else:
+                object_data = bpy.data.meshes.new(name=obj_label + ".temp")
+            result_bobj = bpy.data.objects.new(
+                name=obj_label,
+                object_data=object_data
+            )
+            result_bobj.empty_display_size = self.config["scale"] * 10
         else:
-            object_data = bpy.data.meshes.new(name=obj_label + ".temp")
-        result_bobj = bpy.data.objects.new(
-            name=obj_label,
-            object_data=object_data
-        )
-        if base_bobj:
-            result_bobj.scale = base_bobj.scale
+            self.config["report"]({'WARNING'}, (
+                "  TODO: create_link_instance "
+                "part handling not implemented yet!!"
+            ), pre_line)
+
+        if link_target_bobj:
+            result_bobj.scale = link_target_bobj.scale
             # check if we need to create link children...
-            if base_bobj.children:
+            if link_target_obj.children:
                 self.config["report"]({'WARNING'}, (
                     "  Warning: create_link_instance "
                     "children handling not implemented yet!!"
@@ -716,13 +789,23 @@ class ImportFcstd(object):
             sub_filter_visible = True
         # print(
         #     pre_line +
-        #     "include_only_visible '{}'"
+        #     "handle__sub_objects - include_only_visible '{}'"
         #     "".format(include_only_visible)
+        # )
+        # print(
+        #     pre_line +
+        #     "handle__sub_objects - sub_objects '{}'"
+        #     "".format(sub_objects)
         # )
         sub_objects = fc_helper.filtered_objects(
             sub_objects,
             include_only_visible=sub_filter_visible
         )
+        # print(
+        #     pre_line +
+        #     "handle__sub_objects - sub_objects '{}'"
+        #     "".format(sub_objects)
+        # )
         # │─ ┌─ └─ ├─ ╞═ ╘═╒═
         # ║═ ╔═ ╚═ ╠═ ╟─
         # ┃━ ┏━ ┗━ ┣━ ┠─
@@ -973,7 +1056,7 @@ class ImportFcstd(object):
                     bobj
                 )
                 self.handle_placement(
-                    # pre_line_follow,
+                    pre_line_follow,
                     obj,
                     bobj,
                     enable_scale=True
@@ -1002,6 +1085,7 @@ class ImportFcstd(object):
         func_data,
         obj,
         obj_label,
+        link_target_obj,
         link_target_label,
     ):
         """Add or update link instance object."""
@@ -1026,11 +1110,11 @@ class ImportFcstd(object):
         print(pre_line + "obj_label '{}'".format(obj_label))
         print(pre_line + "link_target_label '{}'".format(link_target_label))
 
-        base_bobj = None
+        link_target_bobj = None
         bobj = None
         if link_target_label in bpy.data.objects:
-            base_bobj = bpy.data.objects[link_target_label]
-            print(pre_line + "# base_bobj ", base_bobj)
+            link_target_bobj = bpy.data.objects[link_target_label]
+            print(pre_line + "# link_target_bobj ", link_target_bobj)
         else:
             self.config["report"](
                 {'WARNING'},
@@ -1051,7 +1135,8 @@ class ImportFcstd(object):
                 func_data,
                 pre_line_follow,
                 obj_label,
-                base_bobj
+                link_target_bobj,
+                link_target_obj
             )
             print(pre_line + "# created new bobj: ", bobj)
             flag_new = True
@@ -1062,7 +1147,7 @@ class ImportFcstd(object):
         # )
         if self.config["update"] or flag_new:
             # if func_data["parent_bobj"] is None:
-            #     func_data["parent_bobj"] = base_bobj
+            #     func_data["parent_bobj"] = link_target_bobj
             # print(
             #     pre_line +
             #     "'{}' try to set parent to '{}' "
@@ -1074,7 +1159,7 @@ class ImportFcstd(object):
             #     bobj
             # )
             self.handle_placement(
-                # pre_line_follow,
+                pre_line_follow,
                 obj,
                 bobj,
                 enable_scale=True
@@ -1086,12 +1171,12 @@ class ImportFcstd(object):
             print(pre_line + "# bobj.data: ", bobj.data)
             if bobj.data:
                 if bobj.data.name != link_target_label:
-                    print(
-                        pre_line +
-                        "update / relink '{}' to original link target '{}'"
-                        "".format(obj_label, link_target_label)
-                    )
                     if link_target_label in bpy.data.meshes:
+                        print(
+                            pre_line +
+                            "update / relink '{}' to original link target '{}'"
+                            "".format(obj_label, link_target_label)
+                        )
                         old_mesh = bobj.data
                         bobj.data = bpy.data.meshes[link_target_label]
                         # clean up temporary mesh
@@ -1326,17 +1411,19 @@ class ImportFcstd(object):
         if obj_linkedobj:
             orig_is_link = func_data["is_link"]
             func_data["is_link"] = True
-            if len(obj.ElementList) > 0:
+
+            if (
+                hasattr(obj, "ElementList")
+                and len(obj.ElementList) > 0
+            ):
                 print(pre_line + "ElementList > 0")
                 self.handle__ObjectWithElementList(func_data)
             else:
-                print(pre_line + "ElementList == 0")
-                # self.sub_collection_add_or_update(func_data, obj_label)
-                # self.parent_empty_add_or_update(func_data, obj_label)
-                # self.handle__AppLinkElement(func_data)
+                print(pre_line + "Single Element → fake list")
                 self.handle__object_with_sub_objects(
                     func_data,
-                    [obj_linkedobj]
+                    [obj_linkedobj],
+                    include_only_visible=[True]
                 )
             # set back to original
             func_data["is_link"] = orig_is_link
@@ -1351,6 +1438,7 @@ class ImportFcstd(object):
     def handle__AppLinkElement(self, func_data, obj_linkedobj=None):
         """Handle App::LinkElement objects."""
         pre_line_orig = func_data["pre_line"]
+
         pre_line = pre_line_orig
         # │─ ┌─ └─ ├─ ╞═ ╘═╒═
         # ║═ ╔═ ╚═ ╠═ ╟─
@@ -1368,7 +1456,6 @@ class ImportFcstd(object):
         pre_line = pre_line_follow
 
         obj = func_data["obj"]
-
         if obj_linkedobj is None:
             obj_linkedobj = func_data["obj"].LinkedObject
 
@@ -1414,6 +1501,7 @@ class ImportFcstd(object):
                 func_data=func_data,
                 obj=obj,
                 obj_label=obj_label,
+                link_target_obj=obj_linkedobj,
                 link_target_label=obj_linkedobj_label,
             )
 
@@ -1437,6 +1525,7 @@ class ImportFcstd(object):
                 func_data=func_data,
                 obj=obj,
                 obj_label=obj_label,
+                link_target_obj=obj_linkedobj,
                 link_target_label=obj_linkedobj_label,
             )
         print(pre_line_end + "")
@@ -1551,13 +1640,17 @@ class ImportFcstd(object):
 
     def handle__PartFeature(self, func_data):
         """Handle Part::Feature objects."""
+        pre_line_orig = func_data["pre_line"]
         pre_line = func_data["pre_line"]
         print(func_data["pre_line"] + "handle__PartFeature")
         pre_line += "  > "
+        func_data["pre_line"] = pre_line
+
         obj = func_data["obj"]
         obj_label = self.get_obj_label(obj)
         if func_data["is_link"] and func_data["obj_label"]:
             obj_label = func_data["obj_label"]
+
         import_it = False
         update_placement = False
         # check if this Part::Feature object is already imported.
@@ -1602,7 +1695,8 @@ class ImportFcstd(object):
                 print(pre_line + "→ update bobj")
                 bobj = bpy.data.objects[obj_label]
                 func_data["bobj"] = bobj
-                update_placement = True
+                if not func_data["is_link"]:
+                    update_placement = True
                 func_data["update_tree"] = True
             else:
                 print(pre_line + "→ just import it")
@@ -1618,10 +1712,15 @@ class ImportFcstd(object):
                 func_data["update_tree"] = True
 
         if update_placement:
+            print(pre_line + "update_placement..")
             self.handle_placement(
+                pre_line,
                 obj,
                 func_data["bobj"],
             )
+
+        # restore
+        func_data["pre_line"] = pre_line_orig
 
     # Mesh::Feature
     def handle__MeshFeature(self, func_data):
@@ -1694,7 +1793,8 @@ class ImportFcstd(object):
         elif obj.isDerivedFrom("App::Part"):
             self.handle__AppPart(func_data)
         elif obj.isDerivedFrom("App::LinkElement"):
-            self.handle__AppLinkElement(func_data)
+            # self.handle__AppLinkElement(func_data)
+            self.handle__AppLink(func_data)
         elif obj.isDerivedFrom("App::Link"):
             self.handle__AppLink(func_data)
         else:
