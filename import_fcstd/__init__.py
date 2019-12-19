@@ -166,11 +166,40 @@ class ImportFcstd(object):
             parent_obj_label = parent_obj.Label
         label = (
             parent_obj_label
-            + "__"
+            + "."
             + obj_label
         )
         label = self.handle_label_prefix(label)
         return label
+
+    def get_sub_obj_label(self, pre_line, func_data, parent_obj, obj):
+        """Get sub object label."""
+        print(
+            pre_line
+            + "func_data['obj_label']: "
+            + b_helper.colors.fg.orange
+            + "'{}'".format(func_data["obj_label"])
+            + b_helper.colors.reset
+        )
+        print(
+            pre_line
+            + "parent_obj              "
+            + b_helper.colors.fg.orange
+            + self.format_obj(parent_obj)
+            + b_helper.colors.reset
+        )
+        print(
+            pre_line
+            + "       obj              "
+            + b_helper.colors.fg.orange
+            + self.format_obj(obj)
+            + b_helper.colors.reset
+        )
+        # obj_label = self.get_obj_combined_label(parent_obj, obj)
+        obj_label = obj.Label
+        if func_data["obj_label"]:
+            obj_label = func_data["obj_label"] + "." + obj_label
+        return obj_label
 
     def fix_link_target_name(self, bobj):
         """Fix name of link target object."""
@@ -350,9 +379,8 @@ class ImportFcstd(object):
         bmesh.update()
         return bmesh
 
-    def create_bobj_from_bmesh(self, func_data, bmesh):
+    def create_bobj_from_bmesh(self, func_data, obj_label, bmesh):
         """Create new object from bmesh."""
-        obj_label = self.get_obj_label(func_data["obj"])
         bobj = bpy.data.objects.new(obj_label, bmesh)
         material_manager = MaterialManager(
             guidata=self.guidata,
@@ -365,46 +393,113 @@ class ImportFcstd(object):
         func_data["bobj"] = bobj
         return bobj
 
-    def add_or_update_blender_obj(self, func_data):
-        """Create or update object with mesh and material data."""
-        pre_line = func_data["pre_line"]
+    def create_or_update_bmesh(self, pre_line, func_data, mesh_label):
+        """Create or update bmesh."""
+        bmesh = None
+        bmesh_import = True
+        if mesh_label in bpy.data.meshes:
+            bmesh = bpy.data.meshes[mesh_label]
+            print(pre_line + "found bmesh!")
+            bmesh_import = False
+            if (
+                mesh_label not in self.imported_obj_names
+                and self.config["update"]
+            ):
+                # rename old mesh -
+                # this way the new mesh can get the original name.
+                helper.rename_old_data(bpy.data.meshes, mesh_label)
+                bmesh_import = True
+        # create bmesh
+        if bmesh_import:
+            bmesh = self.create_bmesh_from_func_data(
+                func_data,
+                mesh_label,
+                enable_import_scale=True
+            )
+            print(pre_line + "create_bmesh_from_func_data: ", bmesh)
+        return bmesh
+
+    def create_or_update_bobj(self, pre_line, func_data, obj_label, bmesh):
+        """Create or update bobj."""
         bobj = None
         is_new = False
-        obj_label = self.get_obj_label(func_data["obj"])
-        if self.config["update"]:
-            # locate existing object (object with same name)
-            if obj_label in bpy.data.objects:
-                bobj = bpy.data.objects[obj_label]
+        bobj_import = True
+        # locate existing object (object with same name)
+        if obj_label in bpy.data.objects:
+            bobj = bpy.data.objects[obj_label]
+            print(pre_line + "found bobj!")
+            bobj_import = False
+            if (
+                obj_label not in self.imported_obj_names
+                and self.config["update"]
+            ):
                 print(
                     pre_line +
                     "Replacing existing object mesh: {}"
                     "".format(obj_label)
                 )
-                # rename old mesh -
-                # this way the new mesh can get the original name.
-                helper.rename_old_data(bpy.data.meshes, obj_label)
-
-        bmesh = self.create_bmesh_from_func_data(
-            func_data,
-            obj_label,
-            enable_import_scale=True
-        )
-
-        if bobj:
-            # update only the mesh of existing object.
-            # copy old materials to new mesh:
-            for mat in bobj.data.materials:
-                bmesh.materials.append(mat)
-            bobj.data = bmesh
-            # self.handle_material_update(func_data, bobj)
-        else:
+                # update only the mesh of existing object.
+                # copy old materials to new mesh:
+                for mat in bobj.data.materials:
+                    bmesh.materials.append(mat)
+                bobj.data = bmesh
+                # self.handle_material_update(func_data, bobj)
+                bobj_import = False
+        # create bobj
+        if bobj_import:
+            # print(
+            #     pre_line +
+            #     "create_bobj_from_bmesh: '{}'"
+            #     "".format(obj_label)
+            # )
             bobj = self.create_bobj_from_bmesh(
                 func_data,
+                obj_label,
                 bmesh
             )
             is_new = True
+            print(
+                pre_line +
+                "created new bobj: {}"
+                "".format(bobj)
+            )
+        return (is_new, bobj)
 
-        if self.config["update"] or is_new:
+    def add_or_update_blender_obj(self, func_data):
+        """Create or update object with mesh and material data."""
+        """
+            What should happen?
+            Normal Object:
+                create mesh
+                create object
+            Link Object:
+                check if we have the mesh already
+                if not create
+                .
+                check if we have the object already
+                if not create it
+
+        """
+        pre_line = func_data["pre_line"]
+
+        obj_label = self.get_obj_label(func_data["obj"])
+        mesh_label = obj_label
+        if func_data["is_link"] and func_data["obj_label"]:
+            obj_label = func_data["obj_label"]
+
+        print(pre_line + "add_or_update_blender_obj")
+        print(pre_line + "obj_label", obj_label)
+        print(pre_line + "mesh_label", mesh_label)
+        print(pre_line + "obj", self.format_obj(func_data["obj"]))
+
+        bmesh = self.create_or_update_bmesh(pre_line, func_data, mesh_label)
+
+        is_new, bobj = self.create_or_update_bobj(pre_line, func_data, obj_label, bmesh)
+
+        if (
+            (self.config["update"] or is_new)
+            # and not func_data["is_link"]
+        ):
             self.handle_placement(func_data["obj"], bobj)
 
         if bobj.name not in self.imported_obj_names:
@@ -465,14 +560,14 @@ class ImportFcstd(object):
                 "".format(bobj, collection)
             )
 
-    def parent_empty_add_or_update(self, func_data, parent_label):
+    def parent_empty_add_or_update(self, func_data, empty_label):
         """Parent Empty handle add or update."""
         print(
             func_data["pre_line"] +
-            "parent_empty_add_or_update: '{}'".format(parent_label)
+            "parent_empty_add_or_update: '{}'".format(empty_label)
         )
         pre_line = func_data["pre_line"] + " → "
-        parent_empty = None
+        empty_obj = None
 
         obj = func_data["obj"]
 
@@ -481,20 +576,22 @@ class ImportFcstd(object):
         #     self.format_obj(func_data["parent_obj"])
         # )
 
-        if parent_label in bpy.data.objects:
+        if empty_label in bpy.data.objects:
             # print(
             #     pre_line +
-            #     "'{}' already in objects list.".format(parent_label)
+            #     "'{}' already in objects list.".format(empty_label)
             # )
             if self.config["update"]:
-                parent_empty = bpy.data.objects[parent_label]
+                empty_obj = bpy.data.objects[empty_label]
                 # print(
                 #     pre_line +
-                #     "update: '{}'".format(parent_empty)
+                #     "update: '{}'".format(empty_obj)
                 # )
             else:
                 renamed_to = helper.rename_old_data(
-                    bpy.data.objects, parent_label)
+                    bpy.data.objects,
+                    empty_label
+                )
                 print(
                     pre_line +
                     "overwrite - renamed to "
@@ -502,38 +599,47 @@ class ImportFcstd(object):
                 )
 
         flag_new = False
-        if parent_empty is None:
+        if empty_obj is None:
             print(
                 pre_line +
-                "create new parent_empty '{}'".format(parent_label)
+                "create new empty_obj '{}'".format(empty_label)
             )
-            parent_empty = bpy.data.objects.new(
-                name=parent_label,
+            empty_obj = bpy.data.objects.new(
+                name=empty_label,
                 object_data=None
             )
-            parent_empty.empty_display_size = 0.01
+            empty_obj.empty_display_size = 0.01
             self.set_obj_parent_and_collection(
-                pre_line, func_data, parent_empty)
+                pre_line, func_data, empty_obj)
 
         if self.config["update"] or flag_new:
             # set position of empty
             if obj:
                 self.handle_placement(
                     obj,
-                    parent_empty,
+                    empty_obj,
                 )
+                # TODO: handle origin things corrrectly...
+                # origin_bobj
+                # if (
+                #     not func_data["origin_bobj"] empty_obj
+                # ):
+                #     self.handle_placement(
+                #         obj,
+                #         empty_obj,
+                #     )
                 # print(
                 #     pre_line +
                 #     "'{}' set position"
-                #     "".format(parent_empty)
+                #     "".format(empty_obj)
                 #     # "'{}' set position to '{}'"
-                #     # "".format(parent_empty, position)
+                #     # "".format(empty_obj, position)
                 # )
 
         # update func_data links
         func_data["parent_obj"] = obj
-        func_data["parent_bobj"] = parent_empty
-        return parent_empty
+        func_data["parent_bobj"] = empty_obj
+        return empty_obj
 
     def create_collection_instance(
         self,
@@ -613,7 +719,6 @@ class ImportFcstd(object):
         #     "include_only_visible '{}'"
         #     "".format(include_only_visible)
         # )
-
         sub_objects = fc_helper.filtered_objects(
             sub_objects,
             include_only_visible=sub_filter_visible
@@ -638,17 +743,44 @@ class ImportFcstd(object):
                 include_only_visible[index]
             ):
                 self.print_obj(obj, pre_line_sub)
+                obj_label = self.get_obj_label(obj)
+                if func_data["is_link"]:
+                    obj_label = self.get_sub_obj_label(
+                        pre_line_follow,
+                        func_data,
+                        parent_obj,
+                        obj
+                    )
+                    print(
+                        pre_line_follow
+                        + "set special link obj_label: "
+                        + b_helper.colors.fg.green
+                        + "'{}'".format(obj_label)
+                        + b_helper.colors.reset
+                    )
                 func_data_new = self.create_func_data()
                 func_data_new["obj"] = obj
+                func_data_new["obj_label"] = obj_label
                 func_data_new["collection"] = func_data["collection"]
                 func_data_new["collection_parent"] = func_data["collection_parent"]
                 func_data_new["parent_obj"] = parent_obj
                 func_data_new["parent_bobj"] = parent_bobj
+                func_data_new["is_link"] = func_data["is_link"]
                 self.import_obj(
                     func_data=func_data_new,
                     pre_line=pre_line_follow,
                 )
-
+                # if func_data["is_link"]:
+                #     print(pre_line_sub + "IS NOW a good moment to set parent?")
+                #     print(
+                #         pre_line_sub +
+                #         "bobj.parent: '{}'  "
+                #         "parent_bobj: '{}'  "
+                #         "".format(
+                #             func_data_new["bobj"].parent,
+                #             func_data_new["parent_bobj"]
+                #         )
+                #     )
             else:
                 self.print_obj(
                     obj=obj,
@@ -680,6 +812,8 @@ class ImportFcstd(object):
         pre_line = func_data["pre_line"]
         parent_obj = func_data["obj"]
         parent_label = self.get_obj_label(parent_obj)
+        if func_data["is_link"] and func_data["obj_label"]:
+            parent_label = func_data["obj_label"]
         print(
             pre_line +
             "handle__object_with_sub_objects '{}'".format(parent_label)
@@ -701,6 +835,7 @@ class ImportFcstd(object):
         #     pre_line + "# func_data[parent_bobj]",
         #     func_data["parent_bobj"]
         # )
+
         self.parent_empty_add_or_update(func_data, parent_label)
         parent_bobj = func_data["parent_bobj"]
         # print(pre_line + "fresh created parent_bobj ", parent_bobj)
@@ -1171,6 +1306,8 @@ class ImportFcstd(object):
         #     "  Warning: App::Link handling is highly experimental!!"
         # ), pre_line)
         obj_label = self.get_obj_label(obj)
+        if func_data["is_link"] and func_data["obj_label"]:
+            obj_label = func_data["obj_label"]
         # obj_linkedobj_label = self.get_obj_linkedobj_label(obj)
         # obj_linked_label = self.get_obj_label(obj_linkedobj)
 
@@ -1187,6 +1324,8 @@ class ImportFcstd(object):
         #     fc_helper.print_obj(obj_linkedobj.LinkedObject, pre_line=pre_line)
 
         if obj_linkedobj:
+            orig_is_link = func_data["is_link"]
+            func_data["is_link"] = True
             if len(obj.ElementList) > 0:
                 print(pre_line + "ElementList > 0")
                 self.handle__ObjectWithElementList(func_data)
@@ -1199,6 +1338,8 @@ class ImportFcstd(object):
                     func_data,
                     [obj_linkedobj]
                 )
+            # set back to original
+            func_data["is_link"] = orig_is_link
         else:
             self.config["report"]({'WARNING'}, (
                 "Warning: '{}' LinkedObject is NONE → skipping."
@@ -1248,6 +1389,8 @@ class ImportFcstd(object):
 
         # obj_label = self.get_obj_combined_label(parent_obj, obj)
         obj_label = self.get_obj_label(obj)
+        if func_data["is_link"] and func_data["obj_label"]:
+            obj_label = func_data["obj_label"]
         # obj_linkedobj_label = self.get_obj_linkedobj_label(obj)
         obj_linkedobj_label = self.get_obj_label(obj_linkedobj)
 
@@ -1413,6 +1556,8 @@ class ImportFcstd(object):
         pre_line += "  > "
         obj = func_data["obj"]
         obj_label = self.get_obj_label(obj)
+        if func_data["is_link"] and func_data["obj_label"]:
+            obj_label = func_data["obj_label"]
         import_it = False
         update_placement = False
         # check if this Part::Feature object is already imported.
@@ -1465,6 +1610,12 @@ class ImportFcstd(object):
 
         if import_it:
             self.create_mesh_from_shape(func_data)
+            if (
+                func_data["verts"]
+                and (func_data["faces"] or func_data["edges"])
+            ):
+                self.add_or_update_blender_obj(func_data)
+                func_data["update_tree"] = True
 
         if update_placement:
             self.handle_placement(
@@ -1490,6 +1641,7 @@ class ImportFcstd(object):
         func_data = {
             "obj": None,
             "bobj": None,
+            "obj_label": None,
             "verts": [],
             "edges": [],
             "faces": [],
@@ -1505,6 +1657,7 @@ class ImportFcstd(object):
             "parent_bobj": None,
             "pre_line": "",
             "update_tree": False,
+            "is_link": False,
         }
         return func_data
 
@@ -1571,37 +1724,10 @@ class ImportFcstd(object):
         # dict for storing all data
         if not func_data:
             func_data = self.create_func_data()
-        # func_data = {
-        #     "obj": obj,
-        #     "bobj": None,
-        #     "verts": [],
-        #     "edges": [],
-        #     "faces": [],
-        #     # face to material relationship
-        #     "matindex": [],
-        #     # to store reusable materials
-        #     "matdatabase": {},
-        #     # name: "Unnamed",
-        #     "link_targets": [],
-        #     "collection": collection,
-        #     "collection_parent": collection_parent,
-        #     "parent_obj": parent_obj,
-        #     "parent_bobj": parent_bobj,
-        #     "pre_line": pre_line,
-        #     "update_tree": False,
-        # }
-        # func_data["matindex"]
         func_data["pre_line"] = pre_line
         obj = func_data["obj"]
         if obj:
             self._import_obj__handle_type(obj, func_data, pre_line)
-
-            if (
-                func_data["verts"]
-                and (func_data["faces"] or func_data["edges"])
-            ):
-                self.add_or_update_blender_obj(func_data)
-                func_data["update_tree"] = True
 
             if func_data["update_tree"]:
                 self.update_tree_collections(func_data)
