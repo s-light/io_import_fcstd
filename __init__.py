@@ -158,7 +158,10 @@ class IMPORT_OT_FreeCAD(bpy.types.Operator):
     )
     option_scale: bpy.props.FloatProperty(
         name="Scaling value",
+        precision=4,
         default=0.001,
+        # soft_min=0.0001,
+        # soft_max=1,
         description=(
             "A scaling value to apply to imported objects. "
             "Default value of 0.001 means one Blender unit = 1 meter"
