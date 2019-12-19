@@ -409,6 +409,10 @@ class ImportFcstd(object):
             bmesh = bpy.data.meshes[mesh_label]
             print(pre_line + "found bmesh!")
             bmesh_import = False
+            # print(pre_line + "mesh_label", mesh_label)
+            # print(pre_line + "self.imported_obj_names")
+            # for obj_name in self.imported_obj_names:
+            #     print(pre_line + " - ", obj_name)
             if (
                 mesh_label not in self.imported_obj_names
                 and self.config["update"]
@@ -419,12 +423,13 @@ class ImportFcstd(object):
                 bmesh_import = True
         # create bmesh
         if bmesh_import:
+            print(pre_line + "import bmesh")
             bmesh = self.create_bmesh_from_func_data(
                 func_data,
                 mesh_label,
                 enable_import_scale=True
             )
-            print(pre_line + "create_bmesh_from_func_data: ", bmesh)
+            # print(pre_line + "create_bmesh_from_func_data: ", bmesh)
             print(
                 pre_line +
                 "set auto_smooth: ({}) '{}°'"
@@ -438,6 +443,8 @@ class ImportFcstd(object):
             if self.config["auto_smooth_use"]:
                 for f in bmesh.polygons:
                     f.use_smooth = True
+            if mesh_label not in self.imported_obj_names:
+                self.imported_obj_names.append(mesh_label)
         return bmesh
 
     def create_or_update_bobj(self, pre_line, func_data, obj_label, bmesh):
@@ -478,13 +485,12 @@ class ImportFcstd(object):
                 obj_label,
                 bmesh
             )
-
             is_new = True
-            print(
-                pre_line +
-                "created new bobj: {}"
-                "".format(bobj)
-            )
+            # print(
+            #     pre_line +
+            #     "created new bobj: {}"
+            #     "".format(bobj)
+            # )
         return (is_new, bobj)
 
     def add_or_update_blender_obj(self, func_data):
@@ -1257,11 +1263,11 @@ class ImportFcstd(object):
         #     )
         # )
 
-        print(
-            pre_line +
-            "self.imported_obj_names ",
-            self.imported_obj_names
-        )
+        # print(
+        #     pre_line +
+        #     "self.imported_obj_names ",
+        #     self.imported_obj_names
+        # )
 
         if (
             obj_linkedobj_label in bpy.data.objects
@@ -1269,7 +1275,7 @@ class ImportFcstd(object):
         ):
             print(
                 pre_line +
-                "Nothing to do. we have already imported/updated '{}'."
+                "→ already imported/updated '{}'."
                 "".format(obj_linkedobj_label)
             )
         else:
@@ -1712,7 +1718,7 @@ class ImportFcstd(object):
                 import_it = True
         else:
             # handle creation of linked copies
-            print(pre_line + "imported_obj_names:", self.imported_obj_names)
+            # print(pre_line + "imported_obj_names:", self.imported_obj_names)
             if (
                 obj_label in bpy.data.objects
                 and obj_label in self.imported_obj_names
@@ -1737,7 +1743,7 @@ class ImportFcstd(object):
                 func_data["update_tree"] = True
 
         if update_placement:
-            print(pre_line + "update_placement..")
+            # print(pre_line + "update_placement..")
             self.handle_placement(
                 pre_line,
                 obj,
