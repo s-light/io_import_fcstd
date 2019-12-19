@@ -152,9 +152,9 @@ def print_blender_console(mode, data, pre_line=""):
     """Print to blenders console area."""
     if bpy:
         message_type = mode.pop()
-        if message_type is 'WARNING':
+        if message_type == 'WARNING':
             message_type = 'INFO'
-        elif message_type is 'INFO':
+        elif message_type == 'INFO':
             message_type = 'OUTPUT'
         else:
             message_type = 'INFO'
@@ -212,29 +212,25 @@ def print_multi(*, mode, data, pre_line="", report=None):
 #                     bpy.ops.console.scrollback_append(
 #                         override, text=data, type=message_type)
 
+
+def purge_block(data_blocks):
+    """Remove all unused object blocks."""
+    counter = 0
+    for block in data_blocks:
+        if block.users == 0:
+            data_blocks.remove(block)
+            counter += 1
+    return counter
+
+
 def purge_all_unused():
     """Remove all unused data blocks."""
     counter = 0
     # keep this order.
     # as the lower things are contained in the higher ones..
-    for block in bpy.data.meshes:
-        if block.users == 0:
-            bpy.data.meshes.remove(block)
-            counter += 1
-
-    for block in bpy.data.materials:
-        if block.users == 0:
-            bpy.data.materials.remove(block)
-            counter += 1
-
-    for block in bpy.data.textures:
-        if block.users == 0:
-            bpy.data.textures.remove(block)
-            counter += 1
-
-    for block in bpy.data.images:
-        if block.users == 0:
-            bpy.data.images.remove(block)
-            counter += 1
-
+    counter += purge_block(bpy.data.objects)
+    counter += purge_block(bpy.data.meshes)
+    counter += purge_block(bpy.data.materials)
+    counter += purge_block(bpy.data.textures)
+    counter += purge_block(bpy.data.images)
     return counter
