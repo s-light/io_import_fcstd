@@ -47,7 +47,7 @@ class IMPORT_OT_FreeCAD_Preferences(bpy.types.AddonPreferences):
 
     # TODO: implement file-choose dialog for the path
 
-    filepath: bpy.props.StringProperty(
+    filepath_freecad: bpy.props.StringProperty(
         subtype='FILE_PATH',
         name="Path to FreeCAD lib",
         description=(
@@ -58,6 +58,18 @@ class IMPORT_OT_FreeCAD_Preferences(bpy.types.AddonPreferences):
         ),
         default="/usr/lib/freecad-daily-python3/lib/FreeCAD.so",
     )
+    filepath_system_packages: bpy.props.StringProperty(
+        subtype='FILE_PATH',
+        name="Path to system python modules",
+        description=(
+            "find with help of python console inside of FreeCAD:\n"
+            ">>> import six\n"
+            ">>> six.__file__\n"
+            "'/usr/lib/python3/dist-packages/six.py'\n"
+            "use first part: '/usr/lib/python3/dist-packages/'"
+        ),
+        default="/usr/lib/python3/dist-packages/",
+    )
 
     def draw(self, context):
         """Draw Preferences."""
@@ -67,7 +79,8 @@ class IMPORT_OT_FreeCAD_Preferences(bpy.types.AddonPreferences):
             " Make sure both FreeCAD and Blender use the same Python version "
             "(check their Python console)"
         ))
-        layout.prop(self, "filepath")
+        layout.prop(self, "filepath_freecad")
+        layout.prop(self, "filepath_system_packages")
 
 
 # class IMPORT_OT_FreeCAD(bpy.types.Operator, ImportHelper):
@@ -198,17 +211,36 @@ class IMPORT_OT_FreeCAD(bpy.types.Operator):
         addon_prefs = user_preferences.addons[__package__].preferences
         return addon_prefs
 
-    def get_freecad_path(self):
+    def get_path_to_freecad(self):
         """Get FreeCAD path from addon preferences."""
         # get the FreeCAD path specified in addon preferences
         addon_prefs = self.get_preferences()
-        path_to_freecad = addon_prefs.filepath
-        print("addon_prefs path_to_freecad", path_to_freecad)
-        return path_to_freecad
+        path = addon_prefs.filepath_freecad
+        print("addon_prefs path_to freecad", path)
+        return path
+
+    def get_path_to_system_packages(self):
+        """Get FreeCAD path from addon preferences."""
+        # get the FreeCAD path specified in addon preferences
+        addon_prefs = self.get_preferences()
+        path = addon_prefs.filepath_system_packages
+        print("addon_prefs path_to system_packages", path)
+        return path
+
+    # def get_path_to(self, target):
+    #     """Get FreeCAD mod path from addon preferences."""
+    #     # get the FreeCAD path specified in addon preferences
+    #     addon_prefs = self.get_preferences()
+    # i currently dont know how to do this...
+    #     path = addon_prefs["filepath_" + target]
+    #     print("addon_prefs path to " + target + " ", path)
+    #     return path
 
     def execute(self, context):
         """Call when the user is done using the modal file-select window."""
-        path_to_freecad = self.get_freecad_path()
+        path_to_freecad = self.get_path_to_freecad()
+        # path_to_system_packages = self.get_path_to("system_packages")
+        path_to_system_packages = self.get_path_to_system_packages()
         dir = self.directory
         for file in self.files:
             filestr = str(file.name)
@@ -226,6 +258,7 @@ class IMPORT_OT_FreeCAD(bpy.types.Operator):
                     obj_name_prefix_with_filename=self.option_prefix_with_filename,
                     links_as_collectioninstance=self.option_links_as_col,
                     path_to_freecad=path_to_freecad,
+                    path_to_system_packages=path_to_system_packages,
                     report=self.report
                 )
                 return my_importer.import_fcstd(filename=dir+filestr)

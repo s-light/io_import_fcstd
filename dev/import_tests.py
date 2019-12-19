@@ -57,33 +57,68 @@ if outside_package_dir not in sys.path:
 
 # fallback path to FreeCAD daily
 path_to_freecad = "/usr/lib/freecad-daily-python3/lib/FreeCAD.so"
+path_to_system_packages = "/usr/lib/python3/dist-packages/"
+
+
+def append_path(path, sub=""):
+    if path and sub:
+        path = os.path.join(path, sub)
+        print("full path:", path)
+    if path and os.path.exists(path):
+        if os.path.isfile(path):
+            path = os.path.dirname(path)
+        print("Configured path:", path)
+        if path not in sys.path:
+            sys.path.append(path)
+    else:
+        print(
+            "Path does not exist. Please check! "
+            "'{}'".format(path)
+        )
+
+
+def get_preferences():
+    """Get addon preferences."""
+    __package__ = "io_import_fcstd"
+    print("__package__: '{}'".format(__package__))
+    addon_prefs = None
+    # pref = bpy.context.preferences.addons["io_import_fcstd"].preferences
+    if bpy:
+        user_preferences = bpy.context.preferences
+        addon_prefs = user_preferences.addons[__package__].preferences
+    return addon_prefs
+
+
+def get_path_to_freecad():
+    """Get FreeCAD path from addon preferences."""
+    # get the FreeCAD path specified in addon preferences
+    addon_prefs = get_preferences()
+    path = addon_prefs.filepath_freecad
+    print("addon_prefs path_to freecad", path)
+    return path
+
+
+def get_path_to_system_packages():
+    """Get FreeCAD path from addon preferences."""
+    # get the FreeCAD path specified in addon preferences
+    addon_prefs = get_preferences()
+    path = addon_prefs.filepath_system_packages
+    print("addon_prefs path_to system_packages", path)
+    return path
 
 
 def append_freecad_path():
     """Append the FreeCAD path."""
     global path_to_freecad
+    global path_to_system_packages
     if bpy:
         # specified in addon preferences
         user_preferences = bpy.context.preferences
         addon_prefs = user_preferences.addons["io_import_fcstd"].preferences
-        path_to_freecad = addon_prefs.filepath
-    if os.path.exists(path_to_freecad):
-        if os.path.isfile(path_to_freecad):
-            path_to_freecad = os.path.dirname(path_to_freecad)
-        print("Configured path to FreeCAD:", path_to_freecad)
-        if path_to_freecad not in sys.path:
-            sys.path.append(path_to_freecad)
-    else:
-        if bpy:
-            print(
-                "FreeCAD path is not configured in preferences correctly. "
-                "'{}'".format(path_to_freecad)
-            )
-        else:
-            print(
-                "Path to FreeCAD does not exist. Please check! "
-                "'{}'".format(path_to_freecad)
-            )
+        path_to_freecad = addon_prefs.filepath_freecad
+        path_to_freecad = get_path_to_freecad()
+        path_to_system_packages = get_path_to_system_packages()
+    append_path(path_to_freecad)
 
 
 try:
@@ -193,6 +228,7 @@ def main_test():
         # obj_name_prefix_with_filename=False,
         links_as_collectioninstance=False,
         path_to_freecad=path_to_freecad,
+        path_to_system_packages=path_to_system_packages,
         # report=None
     )
     my_importer.import_fcstd(filename=filename)

@@ -38,6 +38,7 @@ class ImportFcstd(object):
         obj_name_prefix_with_filename=False,
         links_as_collectioninstance=True,
         path_to_freecad=None,
+        path_to_system_packages=None,
         report=None
     ):
         """Init."""
@@ -58,6 +59,7 @@ class ImportFcstd(object):
             "report": self.print_report,
         }
         self.path_to_freecad = path_to_freecad
+        self.path_to_system_packages = path_to_system_packages
         self.report = report
 
         print('config', self.config)
@@ -1705,21 +1707,63 @@ class ImportFcstd(object):
             self.doc_filename
         )
 
-    def prepare_freecad_import(self):
-        """Prepare FreeCAD import."""
-        # append the FreeCAD path specified in addon preferences
-        path = self.path_to_freecad
+    def append_path(self, path, sub=""):
+        if path and sub:
+            path = os.path.join(path, sub)
+            print("full path:", path)
         if path and os.path.exists(path):
             if os.path.isfile(path):
                 path = os.path.dirname(path)
-            print("Configured path to FreeCAD:", path)
+            print("Configured path:", path)
             if path not in sys.path:
                 sys.path.append(path)
         else:
             self.config["report"]({'WARNING'}, (
-                "Path to FreeCAD does not exist. Please check! "
+                "Path does not exist. Please check! "
                 "'{}'".format(path)
             ))
+
+    def prepare_freecad_import(self):
+        """Prepare FreeCAD import."""
+        # append the FreeCAD path specified in addon preferences
+        self.append_path(self.path_to_freecad)
+        self.append_path(self.path_to_system_packages)
+
+    def handle_additonal_paths(self):
+        """Prepare more paths for import."""
+        # append the FreeCAD path specified in addon preferences
+        import FreeCAD
+        path_base = FreeCAD.getResourceDir() # noqa
+        path_mod = os.path.join(path_base, "Mod")
+        self.append_path(path_mod, "Draft")
+
+    def import_extras(self):
+        """Import additional things."""
+        self.handle_additonal_paths()
+        try:
+            import Part  # noqa
+            # import PartDesign  # noqa
+            import Draft  # noqa
+        except ModuleNotFoundError as e:
+            self.config["report"](
+                {'ERROR'},
+                "Unable to import one of the additional modules. \n"
+                "\n"
+                "Make sure it can be found by Python, \n"
+                "you might need to set its path in this Addon preferences.. "
+                "(User preferences->Addons->expand this addon).\n"
+                "\n"
+                + str(e)
+            )
+            return {'CANCELLED'}
+        except Exception as e:
+            self.config["report"](
+                {'ERROR'},
+                "Import Failed.\n"
+                "\n"
+                + str(e)
+            )
+            return {'CANCELLED'}
 
     def import_fcstd(self, filename=None):
         """Read a FreeCAD .FCStd file and creates Blender objects."""
@@ -1729,8 +1773,7 @@ class ImportFcstd(object):
         try:
             self.prepare_freecad_import()
             import FreeCAD
-        # except ModuleNotFoundError as e:
-        except Exception as e:
+        except ModuleNotFoundError as e:
             self.config["report"](
                 {'ERROR'},
                 "Unable to import the FreeCAD Python module. \n"
@@ -1744,6 +1787,16 @@ class ImportFcstd(object):
                 + str(e)
             )
             return {'CANCELLED'}
+        except Exception as e:
+            self.config["report"](
+                {'ERROR'},
+                "Import Failed.\n"
+                "\n"
+                + str(e)
+            )
+            return {'CANCELLED'}
+
+        self.import_extras()
 
         self.guidata = guidata.load_guidata(
             self.config["filename"],
