@@ -516,14 +516,14 @@ class ImportFcstd(object):
             #     #     bobj
             #     # )
 
-            # if func_data["obj"].isDerivedFrom("Part::Feature"):
-            #     print(pre_line + "       obj isDerivedFrom Part::Feature")
-            # if func_data["obj"].isDerivedFrom("App::Part"):
-            #     print(pre_line + "       obj isDerivedFrom App::Part")
-            # if func_data["parent_obj"].isDerivedFrom("Part::Feature"):
-            #     print(pre_line + "parent_obj isDerivedFrom Part::Feature")
-            # if func_data["parent_obj"].isDerivedFrom("App::Part"):
-            #     print(pre_line + "parent_obj isDerivedFrom App::Part")
+            if func_data["obj"].isDerivedFrom("Part::Feature"):
+                print(pre_line + "       obj isDerivedFrom Part::Feature")
+            if func_data["obj"].isDerivedFrom("App::Part"):
+                print(pre_line + "       obj isDerivedFrom App::Part")
+            if func_data["parent_obj"].isDerivedFrom("Part::Feature"):
+                print(pre_line + "parent_obj isDerivedFrom Part::Feature")
+            if func_data["parent_obj"].isDerivedFrom("App::Part"):
+                print(pre_line + "parent_obj isDerivedFrom App::Part")
 
             if func_data["is_link"]:
                 print(pre_line + "is link")
@@ -1420,6 +1420,11 @@ class ImportFcstd(object):
                 self.handle__ObjectWithElementList(func_data)
             else:
                 print(pre_line + "Single Element → fake list")
+                # if target is of Body type get real link target
+                # this excludes the link → link → link chain...
+                if obj_linkedobj.getLinkedObject().isDerivedFrom("Part::Feature"):
+                    print(pre_line + "use recusive inner target")
+                    obj_linkedobj = obj_linkedobj.getLinkedObject()
                 self.handle__object_with_sub_objects(
                     func_data,
                     [obj_linkedobj],
