@@ -6,6 +6,7 @@
 import sys
 import bpy
 import os
+import math
 # import pprint
 
 from .. import freecad_helper as fc_helper
@@ -25,11 +26,14 @@ class ImportFcstd(object):
 
     def __init__(
         self,
+        *,  # this forces named_properties..
         # filename=None,
         update=True,
         placement=True,
         scale=0.001,
-        tessellation=1.0,
+        tessellation=0.10,
+        auto_smooth_use=True,
+        auto_smooth_angle=math.radians(85),
         skiphidden=True,
         filter_sketch=True,
         sharemats=True,
@@ -48,6 +52,8 @@ class ImportFcstd(object):
             "update": update,
             "placement": placement,
             "tessellation": tessellation,
+            "auto_smooth_use": auto_smooth_use,
+            "auto_smooth_angle": auto_smooth_angle,
             "skiphidden": skiphidden,
             "filter_sketch": filter_sketch,
             "scale": scale,
@@ -174,27 +180,27 @@ class ImportFcstd(object):
 
     def get_sub_obj_label(self, pre_line, func_data, parent_obj, obj):
         """Get sub object label."""
-        print(
-            pre_line
-            + "func_data['obj_label']: "
-            + b_helper.colors.fg.orange
-            + "'{}'".format(func_data["obj_label"])
-            + b_helper.colors.reset
-        )
-        print(
-            pre_line
-            + "parent_obj              "
-            + b_helper.colors.fg.orange
-            + self.format_obj(parent_obj)
-            + b_helper.colors.reset
-        )
-        print(
-            pre_line
-            + "       obj              "
-            + b_helper.colors.fg.orange
-            + self.format_obj(obj)
-            + b_helper.colors.reset
-        )
+        # print(
+        #     pre_line
+        #     + "func_data['obj_label']: "
+        #     + b_helper.colors.fg.orange
+        #     + "'{}'".format(func_data["obj_label"])
+        #     + b_helper.colors.reset
+        # )
+        # print(
+        #     pre_line
+        #     + "parent_obj              "
+        #     + b_helper.colors.fg.orange
+        #     + self.format_obj(parent_obj)
+        #     + b_helper.colors.reset
+        # )
+        # print(
+        #     pre_line
+        #     + "       obj              "
+        #     + b_helper.colors.fg.orange
+        #     + self.format_obj(obj)
+        #     + b_helper.colors.reset
+        # )
         # obj_label = self.get_obj_combined_label(parent_obj, obj)
         obj_label = obj.Label
         if func_data["obj_label"]:
@@ -260,9 +266,9 @@ class ImportFcstd(object):
     ):
         """Handle placement."""
         if self.config["placement"]:
-            print(pre_line)
-            print(pre_line + "   §§§   §§§   handle_placement: '{}'".format(bobj.name))
-            print(pre_line)
+            # print(pre_line)
+            # print(pre_line + "   §§§   §§§   handle_placement: '{}'".format(bobj.name))
+            # print(pre_line)
             new_loc = (obj.Placement.Base * self.config["scale"])
             # attention: multiply does in-place change.
             # so if you call it multiple times on the same value
@@ -419,6 +425,19 @@ class ImportFcstd(object):
                 enable_import_scale=True
             )
             print(pre_line + "create_bmesh_from_func_data: ", bmesh)
+            print(
+                pre_line +
+                "set auto_smooth: ({}) '{}°'"
+                "".format(
+                    self.config["auto_smooth_use"],
+                    math.degrees(self.config["auto_smooth_angle"])
+                )
+            )
+            bmesh.use_auto_smooth = self.config["auto_smooth_use"]
+            bmesh.auto_smooth_angle = self.config["auto_smooth_angle"]
+            if self.config["auto_smooth_use"]:
+                for f in bmesh.polygons:
+                    f.use_smooth = True
         return bmesh
 
     def create_or_update_bobj(self, pre_line, func_data, obj_label, bmesh):
@@ -459,6 +478,7 @@ class ImportFcstd(object):
                 obj_label,
                 bmesh
             )
+
             is_new = True
             print(
                 pre_line +
@@ -500,7 +520,7 @@ class ImportFcstd(object):
 
         # TODO
         if self.config["update"] or is_new:
-            print(pre_line + "placement...")
+            # print(pre_line + "placement...")
             # self.handle_placement(
             #     pre_line,
             #     func_data["obj"],
@@ -516,34 +536,34 @@ class ImportFcstd(object):
             #     #     bobj
             #     # )
 
-            if func_data["obj"].isDerivedFrom("Part::Feature"):
-                print(pre_line + "       obj isDerivedFrom Part::Feature")
-            if func_data["obj"].isDerivedFrom("App::Part"):
-                print(pre_line + "       obj isDerivedFrom App::Part")
-            if func_data["parent_obj"].isDerivedFrom("Part::Feature"):
-                print(pre_line + "parent_obj isDerivedFrom Part::Feature")
-            if func_data["parent_obj"].isDerivedFrom("App::Part"):
-                print(pre_line + "parent_obj isDerivedFrom App::Part")
+            # if func_data["obj"].isDerivedFrom("Part::Feature"):
+            #     print(pre_line + "       obj isDerivedFrom Part::Feature")
+            # if func_data["obj"].isDerivedFrom("App::Part"):
+            #     print(pre_line + "       obj isDerivedFrom App::Part")
+            # if func_data["parent_obj"].isDerivedFrom("Part::Feature"):
+            #     print(pre_line + "parent_obj isDerivedFrom Part::Feature")
+            # if func_data["parent_obj"].isDerivedFrom("App::Part"):
+            #     print(pre_line + "parent_obj isDerivedFrom App::Part")
 
             if func_data["is_link"]:
-                print(pre_line + "is link")
+                # print(pre_line + "is link")
                 if (
                     func_data["obj"].isDerivedFrom("Part::Feature")
                     and func_data["parent_obj"].isDerivedFrom("App::Part")
                 ):
-                    print(
-                        pre_line +
-                        "is_link "
-                        "&& obj is Part::Feature "
-                        "&& parent_obj is App::Part "
-                    )
+                    # print(
+                    #     pre_line +
+                    #     "is_link "
+                    #     "&& obj is Part::Feature "
+                    #     "&& parent_obj is App::Part "
+                    # )
                     self.handle_placement(
                         pre_line,
                         func_data["obj"],
                         bobj
                     )
             else:
-                print(pre_line + "is not link")
+                # print(pre_line + "is not link")
                 self.handle_placement(
                     pre_line,
                     func_data["obj"],

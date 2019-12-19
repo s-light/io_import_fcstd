@@ -1,5 +1,6 @@
 
 
+import math
 import bpy
 
 # ImportHelper is a helper class, defines filename and
@@ -138,8 +139,22 @@ class IMPORT_OT_FreeCAD(bpy.types.Operator):
     )
     option_tessellation: bpy.props.FloatProperty(
         name="Tessellation value",
-        default=1.0,
+        default=0.10,
         description="The tessellation value to apply when triangulating shapes"
+    )
+    option_auto_smooth_use: bpy.props.BoolProperty(
+        name="Auto Smooth",
+        default=True,
+        description="activate auto_smooth on every imported mesh"
+    )
+    option_auto_smooth_angle: bpy.props.FloatProperty(
+        name="Auto Smooth Angle",
+        default=math.radians(85),
+        soft_min=math.radians(1),
+        soft_max=math.radians(180),
+        subtype="ANGLE",
+        unit="ROTATION",
+        description="set auto_smooth_angle on every imported mesh"
     )
     option_scale: bpy.props.FloatProperty(
         name="Scaling value",
@@ -183,8 +198,8 @@ class IMPORT_OT_FreeCAD(bpy.types.Operator):
         ),
     )
     option_links_as_col: bpy.props.BoolProperty(
-        name="EXPERIMENTAL!! App::Link as Collection-Instances",
-        default=True,
+        name="App::Link as Collection-Instances",
+        default=False,
         description=(
             "create App::Link objects as Collection-Instances. \n"
             "therefore create Link-Targets as Collections. \n"
@@ -250,6 +265,8 @@ class IMPORT_OT_FreeCAD(bpy.types.Operator):
                     placement=self.option_placement,
                     scale=self.option_scale,
                     tessellation=self.option_tessellation,
+                    auto_smooth_use=self.option_auto_smooth_use,
+                    auto_smooth_angle=self.option_auto_smooth_angle,
                     skiphidden=self.option_skiphidden,
                     filter_sketch=self.option_filter_sketch,
                     sharemats=self.option_sharemats,
