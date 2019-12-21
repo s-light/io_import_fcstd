@@ -390,20 +390,34 @@ class ImportFcstd(object):
     def create_bobj_from_bmesh(self, func_data, obj_label, bmesh):
         """Create new object from bmesh."""
         bobj = bpy.data.objects.new(obj_label, bmesh)
-        material_manager = MaterialManager(
-            guidata=self.guidata,
-            func_data=func_data,
-            bobj=bobj,
-            obj_label=obj_label,
-            sharemats=self.config["sharemats"]
-        )
-        material_manager.create_new()
+        # check if we already used the bmesh.
+        # if bmesh.name in bpy.data.meshes:
+        #     print(
+        #         func_data["pre_line"] +
+        #         " ignore material import. mesh already existed."
+        #     )
+        # else:
+        if len(bmesh.materials) <= 0:
+            material_manager = MaterialManager(
+                guidata=self.guidata,
+                func_data=func_data,
+                bobj=bobj,
+                obj_label=obj_label,
+                sharemats=self.config["sharemats"]
+            )
+            material_manager.create_new()
+        else:
+            print(
+                func_data["pre_line"] +
+                " ignore material import. mesh already has material."
+            )
         func_data["bobj"] = bobj
         return bobj
 
     def create_or_update_bmesh(self, pre_line, func_data, mesh_label):
         """Create or update bmesh."""
         bmesh = None
+        # bmesh_old_name = None
         bmesh_import = True
         if mesh_label in bpy.data.meshes:
             bmesh = bpy.data.meshes[mesh_label]
@@ -420,6 +434,7 @@ class ImportFcstd(object):
                 # rename old mesh -
                 # this way the new mesh can get the original name.
                 helper.rename_old_data(bpy.data.meshes, mesh_label)
+                # bmesh_old_name = helper.rename_old_data(bpy.data.meshes, mesh_label)
                 bmesh_import = True
         # create bmesh
         if bmesh_import:
@@ -445,6 +460,7 @@ class ImportFcstd(object):
                     f.use_smooth = True
             if mesh_label not in self.imported_obj_names:
                 self.imported_obj_names.append(mesh_label)
+        # return (bmesh, bmesh_old_name)
         return bmesh
 
     def create_or_update_bobj(self, pre_line, func_data, obj_label, bmesh):
@@ -467,9 +483,13 @@ class ImportFcstd(object):
                     "".format(obj_label)
                 )
                 # update only the mesh of existing object.
-                # copy old materials to new mesh:
-                for mat in bobj.data.materials:
-                    bmesh.materials.append(mat)
+                # print(self.imported_obj_names)
+                if len(bmesh.materials) <= 0:
+                    # TODO: fix this!!
+                    # correctly handle multimaterials
+                    # copy old materials to new mesh:
+                    for mat in bobj.data.materials:
+                        bmesh.materials.append(mat)
                 bobj.data = bmesh
                 # self.handle_material_update(func_data, bobj)
                 bobj_import = False
@@ -520,9 +540,11 @@ class ImportFcstd(object):
         print(pre_line + "mesh_label", mesh_label)
         print(pre_line + "obj", self.format_obj(func_data["obj"]))
 
-        bmesh = self.create_or_update_bmesh(pre_line, func_data, mesh_label)
+        bmesh = self.create_or_update_bmesh(
+            pre_line, func_data, mesh_label)
 
-        is_new, bobj = self.create_or_update_bobj(pre_line, func_data, obj_label, bmesh)
+        is_new, bobj = self.create_or_update_bobj(
+            pre_line, func_data, obj_label, bmesh)
 
         # TODO
         if self.config["update"] or is_new:
