@@ -1431,6 +1431,9 @@ class ImportFcstd(object):
 
         obj = func_data["obj"]
         obj_linkedobj = func_data["obj"].LinkedObject
+        if isinstance(obj_linkedobj, tuple):
+            obj_linkedobj = obj_linkedobj[0]
+        # print(pre_line + "obj_linkedobj :", obj_linkedobj)
         # self.config["report"]({'WARNING'}, (
         #     "'{}' ('{s}') of type '{}': "
         #     "".format(obj.Label, obj.Name, obj.TypeId)
@@ -1470,6 +1473,13 @@ class ImportFcstd(object):
                 print(pre_line + "Single Element → fake list")
                 # if target is of Body type get real link target
                 # this excludes the link → link → link chain...
+                # try:
+                #     obj_linkedobj.getLinkedObject().isDerivedFrom("Part::Feature")
+                # except Exception as e:
+                #     print(pre_line + "obj_linkedobj error:", e)
+                # else:
+                #     print(pre_line + "use recusive inner target")
+                #     obj_linkedobj = obj_linkedobj.getLinkedObject()
                 if obj_linkedobj.getLinkedObject().isDerivedFrom("Part::Feature"):
                     print(pre_line + "use recusive inner target")
                     obj_linkedobj = obj_linkedobj.getLinkedObject()
