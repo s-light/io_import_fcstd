@@ -132,6 +132,13 @@ class IMPORT_OT_FreeCAD(bpy.types.Operator):
             "their materials, only replace the geometry"
         )
     )
+    option_update_only_modified_meshes: bpy.props.BoolProperty(
+        name="Update only modified meshes",
+        default=True,
+        description=(
+            "Only replace the geometry if the the source in FreeCAD has changed."
+        )
+    )
     option_placement: bpy.props.BoolProperty(
         name="Use Placements",
         default=True,
@@ -265,6 +272,7 @@ class IMPORT_OT_FreeCAD(bpy.types.Operator):
             if filestr.lower().endswith(".fcstd"):
                 my_importer = import_fcstd.ImportFcstd(
                     update=self.option_update,
+                    update_only_modified_meshes=self.option_update_only_modified_meshes,
                     placement=self.option_placement,
                     scale=self.option_scale,
                     tessellation=self.option_tessellation,

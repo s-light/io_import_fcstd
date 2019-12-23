@@ -29,6 +29,7 @@ class ImportFcstd(object):
         *,  # this forces named_properties..
         # filename=None,
         update=True,
+        update_only_modified_meshes=True,
         placement=True,
         scale=0.001,
         tessellation=0.10,
@@ -50,6 +51,7 @@ class ImportFcstd(object):
         self.config = {
             "filename": None,
             "update": update,
+            "update_only_modified_meshes": update_only_modified_meshes,
             "placement": placement,
             "tessellation": tessellation,
             "auto_smooth_use": auto_smooth_use,
@@ -403,6 +405,7 @@ class ImportFcstd(object):
             for v in bmesh.vertices:
                 v.co *= scale
         bmesh.update()
+        bmesh["freecad_mesh_hash"] = func_data["freecad_mesh_hash"]
         return bmesh
 
     def create_bobj_from_bmesh(self, func_data, obj_label, bmesh):
@@ -432,11 +435,12 @@ class ImportFcstd(object):
         func_data["bobj"] = bobj
         return bobj
 
-    def create_or_update_bmesh(self, pre_line, func_data, mesh_label):
-        """Create or update bmesh."""
+    def create_or_get_bmesh(self, pre_line, func_data, mesh_label):
+        """Create or get bmesh."""
         bmesh = None
         # bmesh_old_name = None
         bmesh_import = True
+        print(pre_line + "create_or_get_bmesh")
         if mesh_label in bpy.data.meshes:
             bmesh = bpy.data.meshes[mesh_label]
             print(pre_line + "found bmesh!")
@@ -449,6 +453,19 @@ class ImportFcstd(object):
                 mesh_label not in self.imported_obj_names
                 and self.config["update"]
             ):
+                if self.config["update_only_modified_meshes"]:
+                    print(
+                        pre_line
+                        + "bmesh.freecad_mesh_hash ",
+                        bmesh.get("freecad_mesh_hash", None)
+                    )
+                    print(
+                        pre_line
+                        + "func_data[freecad_mesh_hash] ",
+                        func_data["freecad_mesh_hash"]
+                    )
+                    # bmesh.get("freecad_mesh_hash", None)
+                    # func_data["freecad_mesh_hash"]
                 # rename old mesh -
                 # this way the new mesh can get the original name.
                 helper.rename_old_data(bpy.data.meshes, mesh_label)
@@ -535,16 +552,10 @@ class ImportFcstd(object):
         """Create or update object with mesh and material data."""
         """
             What should happen?
-            Normal Object:
-                create mesh
-                create object
-            Link Object:
                 check if we have the mesh already
                 if not create
-                .
                 check if we have the object already
                 if not create it
-
         """
         pre_line = func_data["pre_line"]
 
@@ -558,30 +569,13 @@ class ImportFcstd(object):
         print(pre_line + "mesh_label", mesh_label)
         print(pre_line + "obj", self.format_obj(func_data["obj"]))
 
-        bmesh = self.create_or_update_bmesh(
+        bmesh = self.create_or_get_bmesh(
             pre_line, func_data, mesh_label)
 
         is_new, bobj = self.create_or_update_bobj(
             pre_line, func_data, obj_label, bmesh)
 
-        # TODO
         if self.config["update"] or is_new:
-            # print(pre_line + "placement...")
-            # self.handle_placement(
-            #     pre_line,
-            #     func_data["obj"],
-            #     bobj
-            # )
-            # if (
-            #     func_data["is_link"]
-            #     # and not func_data["obj"].isDerivedFrom("Part::Feature")
-            # ):
-            #     # self.handle_placement(
-            #     #     pre_line,
-            #     #     func_data["obj"],
-            #     #     bobj
-            #     # )
-
             # if func_data["obj"].isDerivedFrom("Part::Feature"):
             #     print(pre_line + "       obj isDerivedFrom Part::Feature")
             # if func_data["obj"].isDerivedFrom("App::Part"):
@@ -1017,7 +1011,6 @@ class ImportFcstd(object):
             + "done."
             + b_helper.colors.reset
         ), pre_line=pre_line_end)
-
 
     def handle__object_with_sub_objects(
         self,
@@ -1776,6 +1769,7 @@ class ImportFcstd(object):
         # a placeholder to store edges that belong to a face
         faceedges = []
         shape = func_data["obj"].Shape
+        func_data["freecad_mesh_hash"] = shape.hashCode()
         if self.config["placement"]:
             shape = func_data["obj"].Shape.copy()
             shape.Placement = \
@@ -1786,6 +1780,7 @@ class ImportFcstd(object):
         for edge in shape.Edges:
             if not (edge.hashCode() in faceedges):
                 self.handle_shape_edge(func_data, edge)
+        return shape
 
     def handle__PartFeature(self, func_data):
         """Handle Part::Feature objects."""
@@ -1893,6 +1888,7 @@ class ImportFcstd(object):
             "verts": [],
             "edges": [],
             "faces": [],
+            "freecad_mesh_hash": None,
             # face to material relationship
             "matindex": [],
             # to store reusable materials
