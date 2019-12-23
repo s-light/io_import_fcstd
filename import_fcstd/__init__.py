@@ -187,6 +187,13 @@ class ImportFcstd(object):
         #     + "'{}'".format(func_data["obj_label"])
         #     + b_helper.colors.reset
         # )
+        print(
+            pre_line
+            + "func_data['link_source']: "
+            + b_helper.colors.fg.orange
+            + self.format_obj(func_data["link_source"])
+            + b_helper.colors.reset
+        )
         # print(
         #     pre_line
         #     + "parent_obj              "
@@ -205,6 +212,12 @@ class ImportFcstd(object):
         obj_label = obj.Label
         if func_data["obj_label"]:
             obj_label = func_data["obj_label"] + "." + obj_label
+        # if func_data["link_source"]:
+        #     obj_label = (
+        #         self.get_obj_label(func_data["link_source"])
+        #         + "."
+        #         + obj_label
+        #     )
         return obj_label
 
     def fix_link_target_name(self, bobj):
@@ -1820,6 +1833,7 @@ class ImportFcstd(object):
             "pre_line": "",
             "update_tree": False,
             "is_link": False,
+            "link_source": None,
         }
         return func_data
 
