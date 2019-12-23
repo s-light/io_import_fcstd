@@ -437,10 +437,15 @@ class ImportFcstd(object):
 
     def create_or_get_bmesh(self, pre_line, func_data, mesh_label):
         """Create or get bmesh."""
+        pre_line_orig = func_data["pre_line"]
+        print(pre_line_orig + "create_or_get_bmesh")
+        pre_line = pre_line_orig + "  "
+        func_data["pre_line"] = pre_line
+
         bmesh = None
         # bmesh_old_name = None
         bmesh_import = True
-        print(pre_line + "create_or_get_bmesh")
+
         if mesh_label in bpy.data.meshes:
             bmesh = bpy.data.meshes[mesh_label]
             print(pre_line + "found bmesh!")
@@ -496,11 +501,15 @@ class ImportFcstd(object):
             if mesh_label not in self.imported_obj_names:
                 self.imported_obj_names.append(mesh_label)
         # return (bmesh, bmesh_old_name)
+        func_data["pre_line"] = pre_line_orig
         return bmesh
 
     def create_or_update_bobj(self, pre_line, func_data, obj_label, bmesh):
         """Create or update bobj."""
-        print(pre_line + "create_or_update_bobj")
+        pre_line_orig = func_data["pre_line"]
+        print(pre_line_orig + "create_or_update_bobj")
+        pre_line = pre_line_orig + "  "
+        func_data["pre_line"] = pre_line
         bobj = None
         is_new = False
         bobj_import = True
@@ -547,6 +556,7 @@ class ImportFcstd(object):
             #     "created new bobj: {}"
             #     "".format(bobj)
             # )
+        func_data["pre_line"] = pre_line_orig
         return (is_new, bobj)
 
     def add_or_update_blender_obj(self, func_data):
@@ -558,14 +568,16 @@ class ImportFcstd(object):
                 check if we have the object already
                 if not create it
         """
-        pre_line = func_data["pre_line"]
+        pre_line_orig = func_data["pre_line"]
+        print(pre_line_orig + "add_or_update_blender_obj")
+        pre_line = pre_line_orig + "  "
+        func_data["pre_line"] = pre_line
 
         obj_label = self.get_obj_label(func_data["obj"])
         mesh_label = obj_label
         if func_data["is_link"] and func_data["obj_label"]:
             obj_label = func_data["obj_label"]
 
-        print(pre_line + "add_or_update_blender_obj")
         print(pre_line + "obj_label", obj_label)
         print(pre_line + "mesh_label", mesh_label)
         print(pre_line + "obj", self.format_obj(func_data["obj"]))
@@ -614,6 +626,7 @@ class ImportFcstd(object):
         if bobj.name not in self.imported_obj_names:
             self.imported_obj_names.append(bobj.name)
         func_data["bobj"] = bobj
+        func_data["pre_line"] = pre_line_orig
 
     def sub_collection_add_or_update(self, func_data, collection_label):
         """Part-Collection handle add or update."""
@@ -844,6 +857,7 @@ class ImportFcstd(object):
         is_link_source=False,
     ):
         """Handle sub object."""
+        print(pre_line + "handle__sub_object_import")
         link_source = None
         obj_label = self.get_obj_label(obj)
         # print(pre_line + "obj_label:   " + obj_label)
@@ -936,7 +950,16 @@ class ImportFcstd(object):
         include_only_visible=True,
     ):
         """Handle sub object."""
-        print(pre_line + "handle__sub_objects")
+        # │─ ┌─ └─ ├─ ╞═ ╘═╒═
+        # ║═ ╔═ ╚═ ╠═ ╟─
+        # ┃━ ┏━ ┗━ ┣━ ┠─
+        pre_line_start = pre_line + "╔════ "
+        pre_line_sub_special = pre_line + "╠════ "
+        pre_line_sub = pre_line + "╠═ "
+        pre_line_follow = pre_line + "║   "
+        pre_line_end = pre_line + "╚════ "
+
+        print(pre_line_start + "handle__sub_objects")
         sub_filter_visible = False
         if not isinstance(include_only_visible, list):
             # convert True or False to list
@@ -961,19 +984,12 @@ class ImportFcstd(object):
         #     "handle__sub_objects - sub_objects '{}'"
         #     "".format(sub_objects)
         # )
-        # │─ ┌─ └─ ├─ ╞═ ╘═╒═
-        # ║═ ╔═ ╚═ ╠═ ╟─
-        # ┃━ ┏━ ┗━ ┣━ ┠─
-        pre_line_start = pre_line + "╔════ "
-        pre_line_sub = pre_line + "╠═ "
-        pre_line_follow = pre_line + "║   "
-        pre_line_end = pre_line + "╚════ "
         self.config["report"]({'INFO'}, (
             b_helper.colors.bold
             + b_helper.colors.fg.purple
             + "Import {} Recusive:".format(len(sub_objects))
             + b_helper.colors.reset
-        ), pre_line=pre_line_start)
+        ), pre_line=pre_line_sub_special)
         is_link_source = False
         # if func_data["is_link"] and len(sub_objects) > 1:
         if len(sub_objects) > 1:
@@ -1071,11 +1087,10 @@ class ImportFcstd(object):
     # Arrays and similar
     def handle__ObjectWithElementList(self, func_data):
         """Handle Part::Feature objects."""
-        # pre_line = func_data["pre_line"]
-        # print(
-        #     pre_line +
-        #     "handle__ObjectWithElementList "
-        # )
+        pre_line_orig = func_data["pre_line"]
+        print(pre_line_orig + "handle__ObjectWithElementList")
+        pre_line = pre_line_orig + "  "
+        func_data["pre_line"] = pre_line
         # fc_helper.print_objects(
         #     func_data["obj"].ElementList,
         #     pre_line=pre_line
@@ -1086,15 +1101,19 @@ class ImportFcstd(object):
             func_data["obj"].ElementList,
             include_only_visible=include_only_visible
         )
+        func_data["pre_line"] = pre_line_orig
 
     # Part::FeaturePhython
     def handle__PartFeaturePython_Array(self, func_data):
         """Handle Part::Feature objects."""
-        pre_line = func_data["pre_line"]
+        pre_line_orig = func_data["pre_line"]
         print(
-            pre_line + "handle__PartFeaturePython_Array",
+            pre_line_orig + "handle__PartFeaturePython_Array",
             self.format_obj(func_data["obj"])
         )
+        pre_line = pre_line_orig + "  "
+        func_data["pre_line"] = pre_line
+        pre_line = func_data["pre_line"]
         # print(
         #     pre_line + "ElementList:",
         #     func_data["obj"].ElementList
@@ -1111,6 +1130,7 @@ class ImportFcstd(object):
             func_data["obj"].ElementList
         )
         self.handle__ObjectWithElementList(func_data)
+        func_data["pre_line"] = pre_line_orig
 
     # App::Part
     def handle__AppPart(self, func_data):
@@ -1767,6 +1787,7 @@ class ImportFcstd(object):
 
     def create_mesh_from_shape(self, func_data):
         """Create mesh from shape."""
+        print(func_data["pre_line"] + "create_mesh_from_shape")
         # a placeholder to store edges that belong to a face
         faceedges = []
         shape = func_data["obj"].Shape
@@ -1796,7 +1817,7 @@ class ImportFcstd(object):
         if func_data["is_link"] and func_data["obj_label"]:
             obj_label = func_data["obj_label"]
 
-        import_it = False
+        # import_it = False
         update_placement = False
         # check if this Part::Feature object is already imported.
         if self.config["links_as_collectioninstance"]:
@@ -1829,7 +1850,8 @@ class ImportFcstd(object):
                     instance_target_label=obj_label,
                 )
             else:
-                import_it = True
+                # import_it = True
+                pass
         else:
             # handle creation of linked copies
             # print(pre_line + "imported_obj_names:", self.imported_obj_names)
@@ -1845,16 +1867,16 @@ class ImportFcstd(object):
                 func_data["update_tree"] = True
             else:
                 print(pre_line + "→ just import it")
-                import_it = True
+                # import_it = True
 
-        if import_it:
-            self.create_mesh_from_shape(func_data)
-            if (
-                func_data["verts"]
-                and (func_data["faces"] or func_data["edges"])
-            ):
-                self.add_or_update_blender_obj(func_data)
-                func_data["update_tree"] = True
+        # if import_it:
+        self.create_mesh_from_shape(func_data)
+        if (
+            func_data["verts"]
+            and (func_data["faces"] or func_data["edges"])
+        ):
+            self.add_or_update_blender_obj(func_data)
+            func_data["update_tree"] = True
 
         if update_placement:
             # print(pre_line + "update_placement..")
