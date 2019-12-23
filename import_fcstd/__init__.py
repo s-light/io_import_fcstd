@@ -446,10 +446,24 @@ class ImportFcstd(object):
         # bmesh_old_name = None
         bmesh_import = True
 
+        print(pre_line + "mesh_label", mesh_label)
+        print(pre_line + "bpy.data.meshes ({})".format(len(bpy.data.meshes)))
+        for mesh in bpy.data.meshes:
+            print(pre_line + " - ", mesh)
         if mesh_label in bpy.data.meshes:
             bmesh = bpy.data.meshes[mesh_label]
             print(pre_line + "found bmesh!")
             bmesh_import = False
+            print(
+                pre_line
+                + "bmesh.freecad_mesh_hash ",
+                bmesh.get("freecad_mesh_hash", None)
+            )
+            print(
+                pre_line
+                + "func_data[freecad_mesh_hash] ",
+                func_data["freecad_mesh_hash"]
+            )
             # print(pre_line + "mesh_label", mesh_label)
             # print(pre_line + "self.imported_obj_names")
             # for obj_name in self.imported_obj_names:
@@ -459,16 +473,7 @@ class ImportFcstd(object):
                 and self.config["update"]
             ):
                 if self.config["update_only_modified_meshes"]:
-                    print(
-                        pre_line
-                        + "bmesh.freecad_mesh_hash ",
-                        bmesh.get("freecad_mesh_hash", None)
-                    )
-                    print(
-                        pre_line
-                        + "func_data[freecad_mesh_hash] ",
-                        func_data["freecad_mesh_hash"]
-                    )
+                    print(pre_line + "update_only_modified_meshes: TODO")
                     # bmesh.get("freecad_mesh_hash", None)
                     # func_data["freecad_mesh_hash"]
                 # rename old mesh -
@@ -857,7 +862,10 @@ class ImportFcstd(object):
         is_link_source=False,
     ):
         """Handle sub object."""
-        print(pre_line + "handle__sub_object_import")
+        pre_line_orig = func_data["pre_line"]
+        print(pre_line_orig + "handle__sub_object_import")
+        pre_line = pre_line_orig + "  "
+        func_data["pre_line"] = pre_line
         link_source = None
         obj_label = self.get_obj_label(obj)
         # print(pre_line + "obj_label:   " + obj_label)
@@ -924,21 +932,12 @@ class ImportFcstd(object):
         func_data_new["parent_bobj"] = parent_bobj
         func_data_new["is_link"] = func_data["is_link"]
         func_data_new["link_source"] = link_source
+        print(pre_line + "import_obj ...")
         self.import_obj(
             func_data=func_data_new,
             pre_line=pre_line,
         )
-        # if func_data["is_link"]:
-        #     print(pre_line + "IS NOW a good moment to set parent?")
-        #     print(
-        #         pre_line +
-        #         "bobj.parent: '{}'  "
-        #         "parent_bobj: '{}'  "
-        #         "".format(
-        #             func_data_new["bobj"].parent,
-        #             func_data_new["parent_bobj"]
-        #         )
-        #     )
+        func_data["pre_line"] = pre_line_orig
 
     def handle__sub_objects(
         self,
@@ -959,7 +958,11 @@ class ImportFcstd(object):
         pre_line_follow = pre_line + "║   "
         pre_line_end = pre_line + "╚════ "
 
+        pre_line_orig = func_data["pre_line"]
+        pre_line = pre_line_follow
+        func_data["pre_line"] = pre_line
         print(pre_line_start + "handle__sub_objects")
+
         sub_filter_visible = False
         if not isinstance(include_only_visible, list):
             # convert True or False to list
@@ -967,12 +970,12 @@ class ImportFcstd(object):
             sub_filter_visible = True
         # print(
         #     pre_line +
-        #     "handle__sub_objects - include_only_visible '{}'"
+        #     "include_only_visible '{}'"
         #     "".format(include_only_visible)
         # )
         # print(
         #     pre_line +
-        #     "handle__sub_objects - sub_objects '{}'"
+        #     "sub_objects '{}'"
         #     "".format(sub_objects)
         # )
         sub_objects = fc_helper.filtered_objects(
@@ -1018,6 +1021,7 @@ class ImportFcstd(object):
                         + b_helper.colors.reset
                     )
                 )
+        func_data["pre_line"] = pre_line_orig
 
         if func_data["bobj"] is None:
             func_data["bobj"] = parent_bobj
@@ -1791,7 +1795,8 @@ class ImportFcstd(object):
         # a placeholder to store edges that belong to a face
         faceedges = []
         shape = func_data["obj"].Shape
-        func_data["freecad_mesh_hash"] = shape.hashCode()
+        # func_data["freecad_mesh_hash"] = shape.hashCode()
+        # hashCode changes on every file opening :-(
         if self.config["placement"]:
             shape = func_data["obj"].Shape.copy()
             shape.Placement = \
@@ -1809,7 +1814,7 @@ class ImportFcstd(object):
         pre_line_orig = func_data["pre_line"]
         pre_line = func_data["pre_line"]
         print(func_data["pre_line"] + "handle__PartFeature")
-        pre_line += "  > "
+        pre_line += "> "
         func_data["pre_line"] = pre_line
 
         obj = func_data["obj"]
@@ -1854,6 +1859,7 @@ class ImportFcstd(object):
                 pass
         else:
             # handle creation of linked copies
+            print(pre_line + "handle creation of linked copies..")
             # print(pre_line + "imported_obj_names:", self.imported_obj_names)
             if (
                 obj_label in bpy.data.objects
