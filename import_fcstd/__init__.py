@@ -833,6 +833,82 @@ class ImportFcstd(object):
                 ), pre_line)
         return result_bobj
 
+    def handle__sub_object_import(
+        self,
+        *,
+        func_data,
+        obj,
+        pre_line,
+        parent_obj,
+        parent_bobj
+    ):
+        """Handle sub object."""
+        # link_source = None
+        # link_source = func_data["link_source"]
+        obj_label = self.get_obj_label(obj)
+        if func_data["is_link"]:
+            obj_label = self.get_sub_obj_label(
+                pre_line,
+                func_data,
+                parent_obj,
+                obj
+            )
+            print(
+                pre_line
+                + "set special link obj_label: "
+                + b_helper.colors.fg.green
+                + "'{}'".format(obj_label)
+                + b_helper.colors.reset
+            )
+            # link_source = parent_obj
+            # if func_data["link_source"]:
+            #     link_source = func_data["link_source"]
+        # # debug output
+        # print(pre_line + "obj:         " + self.format_obj(obj))
+        # print(pre_line + "obj_label:   " + obj_label)
+        # print(pre_line + "parent_obj:  " + self.format_obj(parent_obj))
+        # # print(pre_line + "func_data[is_link]:  {}".format(func_data["is_link"]))
+        # is_link_color = b_helper.colors.fg.red
+        # if func_data["is_link"]:
+        #     is_link_color = b_helper.colors.fg.green
+        # print(
+        #     pre_line
+        #     + "func_data[is_link]: "
+        #     + is_link_color
+        #     + "{}".format(func_data["is_link"])
+        #     + b_helper.colors.reset
+        # )
+        # print(
+        #     pre_line
+        #     + "link_source:  "
+        #     + self.format_obj(link_source)
+        # )
+        # prepare import
+        func_data_new = self.create_func_data()
+        func_data_new["obj"] = obj
+        func_data_new["obj_label"] = obj_label
+        func_data_new["collection"] = func_data["collection"]
+        func_data_new["collection_parent"] = func_data["collection_parent"]
+        func_data_new["parent_obj"] = parent_obj
+        func_data_new["parent_bobj"] = parent_bobj
+        func_data_new["is_link"] = func_data["is_link"]
+        # func_data_new["link_source"] = link_source
+        self.import_obj(
+            func_data=func_data_new,
+            pre_line=pre_line,
+        )
+        # if func_data["is_link"]:
+        #     print(pre_line + "IS NOW a good moment to set parent?")
+        #     print(
+        #         pre_line +
+        #         "bobj.parent: '{}'  "
+        #         "parent_bobj: '{}'  "
+        #         "".format(
+        #             func_data_new["bobj"].parent,
+        #             func_data_new["parent_bobj"]
+        #         )
+        #     )
+
     def handle__sub_objects(
         self,
         func_data,
@@ -886,45 +962,14 @@ class ImportFcstd(object):
                 obj,
                 include_only_visible[index]
             ):
-                self.print_obj(obj, pre_line_sub)
-                obj_label = self.get_obj_label(obj)
-                if func_data["is_link"]:
-                    obj_label = self.get_sub_obj_label(
-                        pre_line_follow,
-                        func_data,
-                        parent_obj,
-                        obj
-                    )
-                    print(
-                        pre_line_follow
-                        + "set special link obj_label: "
-                        + b_helper.colors.fg.green
-                        + "'{}'".format(obj_label)
-                        + b_helper.colors.reset
-                    )
-                func_data_new = self.create_func_data()
-                func_data_new["obj"] = obj
-                func_data_new["obj_label"] = obj_label
-                func_data_new["collection"] = func_data["collection"]
-                func_data_new["collection_parent"] = func_data["collection_parent"]
-                func_data_new["parent_obj"] = parent_obj
-                func_data_new["parent_bobj"] = parent_bobj
-                func_data_new["is_link"] = func_data["is_link"]
-                self.import_obj(
-                    func_data=func_data_new,
+                self.print_obj(obj, pre_line)
+                self.handle__sub_object_import(
+                    func_data=func_data,
+                    obj=obj,
                     pre_line=pre_line_follow,
+                    parent_obj=parent_obj,
+                    parent_bobj=parent_bobj
                 )
-                # if func_data["is_link"]:
-                #     print(pre_line_sub + "IS NOW a good moment to set parent?")
-                #     print(
-                #         pre_line_sub +
-                #         "bobj.parent: '{}'  "
-                #         "parent_bobj: '{}'  "
-                #         "".format(
-                #             func_data_new["bobj"].parent,
-                #             func_data_new["parent_bobj"]
-                #         )
-                #     )
             else:
                 self.print_obj(
                     obj=obj,
@@ -945,6 +990,7 @@ class ImportFcstd(object):
             + "done."
             + b_helper.colors.reset
         ), pre_line=pre_line_end)
+
 
     def handle__object_with_sub_objects(
         self,
