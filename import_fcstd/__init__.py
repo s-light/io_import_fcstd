@@ -446,24 +446,24 @@ class ImportFcstd(object):
         # bmesh_old_name = None
         bmesh_import = True
 
-        print(pre_line + "mesh_label", mesh_label)
-        print(pre_line + "bpy.data.meshes ({})".format(len(bpy.data.meshes)))
-        for mesh in bpy.data.meshes:
-            print(pre_line + " - ", mesh)
+        print(pre_line + "mesh_label:", mesh_label)
+        # print(pre_line + "bpy.data.meshes ({})".format(len(bpy.data.meshes)))
+        # for mesh in bpy.data.meshes:
+        #     print(pre_line + " - ", mesh)
         if mesh_label in bpy.data.meshes:
             bmesh = bpy.data.meshes[mesh_label]
             print(pre_line + "found bmesh!")
             bmesh_import = False
-            print(
-                pre_line
-                + "bmesh.freecad_mesh_hash ",
-                bmesh.get("freecad_mesh_hash", None)
-            )
-            print(
-                pre_line
-                + "func_data[freecad_mesh_hash] ",
-                func_data["freecad_mesh_hash"]
-            )
+            # print(
+            #     pre_line
+            #     + "bmesh.freecad_mesh_hash ",
+            #     bmesh.get("freecad_mesh_hash", None)
+            # )
+            # print(
+            #     pre_line
+            #     + "func_data[freecad_mesh_hash] ",
+            #     func_data["freecad_mesh_hash"]
+            # )
             # print(pre_line + "mesh_label", mesh_label)
             # print(pre_line + "self.imported_obj_names")
             # for obj_name in self.imported_obj_names:
