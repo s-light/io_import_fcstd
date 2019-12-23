@@ -500,6 +500,7 @@ class ImportFcstd(object):
 
     def create_or_update_bobj(self, pre_line, func_data, obj_label, bmesh):
         """Create or update bobj."""
+        print(pre_line + "create_or_update_bobj")
         bobj = None
         is_new = False
         bobj_import = True
@@ -845,7 +846,7 @@ class ImportFcstd(object):
         """Handle sub object."""
         link_source = None
         obj_label = self.get_obj_label(obj)
-        print(pre_line + "obj_label:   " + obj_label)
+        # print(pre_line + "obj_label:   " + obj_label)
         if func_data["is_link"]:
             obj_label = self.get_sub_obj_label(
                 pre_line,
@@ -864,41 +865,41 @@ class ImportFcstd(object):
         if is_link_source:
             link_source = obj
         # debug output
-        print(pre_line + ("*"*42))
-        print(pre_line + "obj:         " + self.format_obj(obj))
-        print(pre_line + "parent_obj:  " + self.format_obj(parent_obj))
-        # print(pre_line + "func_data[is_link]:  {}".format(func_data["is_link"]))
-        is_link_color = b_helper.colors.fg.red
-        if func_data["is_link"]:
-            is_link_color = b_helper.colors.fg.green
-        print(
-            pre_line
-            + "func_data[is_link]: "
-            + is_link_color
-            + "{}".format(func_data["is_link"])
-            + b_helper.colors.reset
-        )
-        is_link_source_color = b_helper.colors.fg.red
-        if is_link_source:
-            is_link_source_color = b_helper.colors.fg.green
-        print(
-            pre_line
-            + "is_link_source: "
-            + is_link_source_color
-            + "{}".format(is_link_source)
-            + b_helper.colors.reset
-        )
-        print(
-            pre_line
-            + "func_data[link_source]:  "
-            + self.format_obj(func_data["link_source"])
-        )
-        print(
-            pre_line
-            + "link_source:  "
-            + self.format_obj(link_source)
-        )
-        print(pre_line + ("*"*42))
+        # print(pre_line + ("*"*42))
+        # print(pre_line + "obj:         " + self.format_obj(obj))
+        # print(pre_line + "parent_obj:  " + self.format_obj(parent_obj))
+        # # print(pre_line + "func_data[is_link]:  {}".format(func_data["is_link"]))
+        # is_link_color = b_helper.colors.fg.red
+        # if func_data["is_link"]:
+        #     is_link_color = b_helper.colors.fg.green
+        # print(
+        #     pre_line
+        #     + "func_data[is_link]: "
+        #     + is_link_color
+        #     + "{}".format(func_data["is_link"])
+        #     + b_helper.colors.reset
+        # )
+        # is_link_source_color = b_helper.colors.fg.red
+        # if is_link_source:
+        #     is_link_source_color = b_helper.colors.fg.green
+        # print(
+        #     pre_line
+        #     + "is_link_source: "
+        #     + is_link_source_color
+        #     + "{}".format(is_link_source)
+        #     + b_helper.colors.reset
+        # )
+        # print(
+        #     pre_line
+        #     + "func_data[link_source]:  "
+        #     + self.format_obj(func_data["link_source"])
+        # )
+        # print(
+        #     pre_line
+        #     + "link_source:  "
+        #     + self.format_obj(link_source)
+        # )
+        # print(pre_line + ("*"*42))
         # prepare import
         func_data_new = self.create_func_data()
         func_data_new["obj"] = obj
@@ -982,7 +983,7 @@ class ImportFcstd(object):
                 obj,
                 include_only_visible[index]
             ):
-                self.print_obj(obj, pre_line)
+                self.print_obj(obj, pre_line_sub)
                 self.handle__sub_object_import(
                     func_data=func_data,
                     obj=obj,
@@ -1834,7 +1835,7 @@ class ImportFcstd(object):
             # print(pre_line + "imported_obj_names:", self.imported_obj_names)
             if (
                 obj_label in bpy.data.objects
-                and obj_label in self.imported_obj_names
+                # and obj_label in self.imported_obj_names
             ):
                 print(pre_line + "→ update bobj")
                 bobj = bpy.data.objects[obj_label]
