@@ -182,13 +182,18 @@ class ImportFcstd(object):
 
     def get_sub_obj_label(self, pre_line, func_data, parent_obj, obj):
         """Get sub object label."""
-        # print(
-        #     pre_line
-        #     + "func_data['obj_label']: "
-        #     + b_helper.colors.fg.orange
-        #     + "'{}'".format(func_data["obj_label"])
-        #     + b_helper.colors.reset
-        # )
+        print(
+            pre_line
+            + "get_sub_obj_label"
+        )
+        pre_line += ". "
+        print(
+            pre_line
+            + "func_data['obj_label']: "
+            + b_helper.colors.fg.orange
+            + "'{}'".format(func_data["obj_label"])
+            + b_helper.colors.reset
+        )
         print(
             pre_line
             + "func_data['link_source']: "
@@ -196,20 +201,20 @@ class ImportFcstd(object):
             + self.format_obj(func_data["link_source"])
             + b_helper.colors.reset
         )
-        # print(
-        #     pre_line
-        #     + "parent_obj              "
-        #     + b_helper.colors.fg.orange
-        #     + self.format_obj(parent_obj)
-        #     + b_helper.colors.reset
-        # )
-        # print(
-        #     pre_line
-        #     + "       obj              "
-        #     + b_helper.colors.fg.orange
-        #     + self.format_obj(obj)
-        #     + b_helper.colors.reset
-        # )
+        print(
+            pre_line
+            + "parent_obj              "
+            + b_helper.colors.fg.orange
+            + self.format_obj(parent_obj)
+            + b_helper.colors.reset
+        )
+        print(
+            pre_line
+            + "       obj              "
+            + b_helper.colors.fg.orange
+            + self.format_obj(obj)
+            + b_helper.colors.reset
+        )
         # obj_label = self.get_obj_combined_label(parent_obj, obj)
         # if func_data["obj_label"]:
         #     obj_label = (
@@ -344,11 +349,12 @@ class ImportFcstd(object):
                 if bobj.name not in func_data["collection"].objects:
                     add_to_collection = True
                 else:
-                    print(
-                        pre_line +
-                        "'{}' already in collection '{}'"
-                        "".format(bobj.name, func_data["collection"])
-                    )
+                    # print(
+                    #     pre_line +
+                    #     "'{}' already in collection '{}'"
+                    #     "".format(bobj.name, func_data["collection"])
+                    # )
+                    pass
             else:
                 add_to_collection = True
 
@@ -452,7 +458,7 @@ class ImportFcstd(object):
         #     print(pre_line + " - ", mesh)
         if mesh_label in bpy.data.meshes:
             bmesh = bpy.data.meshes[mesh_label]
-            print(pre_line + "found bmesh!")
+            print(pre_line + "use found bmesh.")
             bmesh_import = False
             # print(
             #     pre_line
@@ -483,7 +489,7 @@ class ImportFcstd(object):
                 bmesh_import = True
         # create bmesh
         if bmesh_import:
-            print(pre_line + "import bmesh")
+            print(pre_line + "import bmesh.")
             bmesh = self.create_bmesh_from_func_data(
                 func_data,
                 mesh_label,
@@ -583,9 +589,9 @@ class ImportFcstd(object):
         if func_data["is_link"] and func_data["obj_label"]:
             obj_label = func_data["obj_label"]
 
-        print(pre_line + "obj_label", obj_label)
-        print(pre_line + "mesh_label", mesh_label)
-        print(pre_line + "obj", self.format_obj(func_data["obj"]))
+        # print(pre_line + "obj_label", obj_label)
+        # print(pre_line + "mesh_label", mesh_label)
+        # print(pre_line + "obj", self.format_obj(func_data["obj"]))
 
         bmesh = self.create_or_get_bmesh(
             pre_line, func_data, mesh_label)
@@ -887,41 +893,41 @@ class ImportFcstd(object):
         if is_link_source:
             link_source = obj
         # debug output
-        # print(pre_line + ("*"*42))
-        # print(pre_line + "obj:         " + self.format_obj(obj))
-        # print(pre_line + "parent_obj:  " + self.format_obj(parent_obj))
-        # # print(pre_line + "func_data[is_link]:  {}".format(func_data["is_link"]))
-        # is_link_color = b_helper.colors.fg.red
-        # if func_data["is_link"]:
-        #     is_link_color = b_helper.colors.fg.green
-        # print(
-        #     pre_line
-        #     + "func_data[is_link]: "
-        #     + is_link_color
-        #     + "{}".format(func_data["is_link"])
-        #     + b_helper.colors.reset
-        # )
-        # is_link_source_color = b_helper.colors.fg.red
-        # if is_link_source:
-        #     is_link_source_color = b_helper.colors.fg.green
-        # print(
-        #     pre_line
-        #     + "is_link_source: "
-        #     + is_link_source_color
-        #     + "{}".format(is_link_source)
-        #     + b_helper.colors.reset
-        # )
-        # print(
-        #     pre_line
-        #     + "func_data[link_source]:  "
-        #     + self.format_obj(func_data["link_source"])
-        # )
-        # print(
-        #     pre_line
-        #     + "link_source:  "
-        #     + self.format_obj(link_source)
-        # )
-        # print(pre_line + ("*"*42))
+        print(pre_line + ("*"*42))
+        print(pre_line + "obj:         " + self.format_obj(obj))
+        print(pre_line + "parent_obj:  " + self.format_obj(parent_obj))
+        # print(pre_line + "func_data[is_link]:  {}".format(func_data["is_link"]))
+        is_link_color = b_helper.colors.fg.red
+        if func_data["is_link"]:
+            is_link_color = b_helper.colors.fg.green
+        print(
+            pre_line
+            + "func_data[is_link]: "
+            + is_link_color
+            + "{}".format(func_data["is_link"])
+            + b_helper.colors.reset
+        )
+        is_link_source_color = b_helper.colors.fg.red
+        if is_link_source:
+            is_link_source_color = b_helper.colors.fg.green
+        print(
+            pre_line
+            + "is_link_source: "
+            + is_link_source_color
+            + "{}".format(is_link_source)
+            + b_helper.colors.reset
+        )
+        print(
+            pre_line
+            + "func_data[link_source]:  "
+            + self.format_obj(func_data["link_source"])
+        )
+        print(
+            pre_line
+            + "link_source:  "
+            + self.format_obj(link_source)
+        )
+        print(pre_line + ("*"*42))
         # prepare import
         func_data_new = self.create_func_data()
         func_data_new["obj"] = obj
@@ -947,6 +953,7 @@ class ImportFcstd(object):
         parent_obj,
         parent_bobj,
         include_only_visible=True,
+        is_link_source=False,
     ):
         """Handle sub object."""
         # │─ ┌─ └─ ├─ ╞═ ╘═╒═
@@ -961,8 +968,12 @@ class ImportFcstd(object):
         pre_line_orig = func_data["pre_line"]
         pre_line = pre_line_follow
         func_data["pre_line"] = pre_line
-        print(pre_line_start + "handle__sub_objects")
-
+        print(
+            pre_line_start
+            + "handle__sub_objects"
+            # + " - sub_objects '{}'"
+            # + "".format(sub_objects)
+        )
         sub_filter_visible = False
         if not isinstance(include_only_visible, list):
             # convert True or False to list
@@ -978,25 +989,25 @@ class ImportFcstd(object):
         #     "sub_objects '{}'"
         #     "".format(sub_objects)
         # )
+        print(
+            pre_line +
+            "is_link_source '{}'"
+            "".format(is_link_source)
+        )
         sub_objects = fc_helper.filtered_objects(
             sub_objects,
             include_only_visible=sub_filter_visible
         )
-        # print(
-        #     pre_line +
-        #     "handle__sub_objects - sub_objects '{}'"
-        #     "".format(sub_objects)
-        # )
         self.config["report"]({'INFO'}, (
             b_helper.colors.bold
             + b_helper.colors.fg.purple
             + "Import {} Recusive:".format(len(sub_objects))
             + b_helper.colors.reset
         ), pre_line=pre_line_sub_special)
-        is_link_source = False
-        # if func_data["is_link"] and len(sub_objects) > 1:
-        if len(sub_objects) > 1:
-            is_link_source = True
+        # is_link_source = False
+        # # if func_data["is_link"] and len(sub_objects) > 1:
+        # if len(sub_objects) > 1:
+        #     is_link_source = True
         for index, obj in enumerate(sub_objects):
             if self.check_obj_visibility_with_skiphidden(
                 obj,
@@ -1038,6 +1049,7 @@ class ImportFcstd(object):
         func_data,
         sub_objects,
         include_only_visible=True,
+        is_link_source=False,
     ):
         """Handle sub objects."""
         pre_line = func_data["pre_line"]
@@ -1049,6 +1061,7 @@ class ImportFcstd(object):
             pre_line +
             "handle__object_with_sub_objects '{}'".format(parent_label)
         )
+        print(pre_line + "is_link_source '{}'".format(is_link_source))
         # pre_line += "→ "
         # print(pre_line + "force update parent_bobj to match parent_obj")
         p_label = self.get_obj_label(func_data["parent_obj"])
@@ -1079,6 +1092,7 @@ class ImportFcstd(object):
                 parent_obj,
                 parent_bobj,
                 include_only_visible=include_only_visible,
+                is_link_source=is_link_source,
             )
         else:
             self.config["report"]({'INFO'}, (
@@ -1089,7 +1103,7 @@ class ImportFcstd(object):
 
     # ##########################################
     # Arrays and similar
-    def handle__ObjectWithElementList(self, func_data):
+    def handle__ObjectWithElementList(self, func_data, is_link_source=False):
         """Handle Part::Feature objects."""
         pre_line_orig = func_data["pre_line"]
         print(pre_line_orig + "handle__ObjectWithElementList")
@@ -1103,7 +1117,8 @@ class ImportFcstd(object):
         self.handle__object_with_sub_objects(
             func_data,
             func_data["obj"].ElementList,
-            include_only_visible=include_only_visible
+            include_only_visible=include_only_visible,
+            is_link_source=is_link_source
         )
         func_data["pre_line"] = pre_line_orig
 
@@ -1133,7 +1148,15 @@ class ImportFcstd(object):
             pre_line + "ElementList:",
             func_data["obj"].ElementList
         )
-        self.handle__ObjectWithElementList(func_data)
+        print(
+            pre_line
+            + "call handle__ObjectWithElementList with "
+            + b_helper.colors.fg.orange
+            + "is_link_source=True"
+            + b_helper.colors.reset
+            + ".."
+        )
+        self.handle__ObjectWithElementList(func_data, is_link_source=True)
         func_data["pre_line"] = pre_line_orig
 
     # App::Part
@@ -1791,7 +1814,7 @@ class ImportFcstd(object):
 
     def create_mesh_from_shape(self, func_data):
         """Create mesh from shape."""
-        print(func_data["pre_line"] + "create_mesh_from_shape")
+        # print(func_data["pre_line"] + "create_mesh_from_shape")
         # a placeholder to store edges that belong to a face
         faceedges = []
         shape = func_data["obj"].Shape
