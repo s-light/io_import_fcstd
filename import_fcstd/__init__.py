@@ -180,7 +180,8 @@ class ImportFcstd(object):
         label = self.handle_label_prefix(label)
         return label
 
-    def get_sub_obj_label(self, pre_line, func_data, parent_obj, obj):
+    # def get_sub_obj_label(self, pre_line, func_data, parent_obj, obj):
+    def get_sub_obj_label(self, pre_line, func_data, obj):
         """Get sub object label."""
         # print(
         #     pre_line
@@ -384,11 +385,11 @@ class ImportFcstd(object):
             and func_data["parent_bobj"] is not None
         ):
             bobj.parent = func_data["parent_bobj"]
-            # print(
-            #     pre_line +
-            #     "update_tree_parents: '{}' set parent to '{}' "
-            #     "".format(bobj, func_data["parent_bobj"])
-            # )
+            print(
+                pre_line +
+                "update_tree_parents: '{}' set parent to '{}' "
+                "".format(bobj, func_data["parent_bobj"])
+            )
             # TODO: check 'update'
 
     def create_bmesh_from_func_data(
@@ -675,11 +676,11 @@ class ImportFcstd(object):
     def set_obj_parent_and_collection(self, pre_line, func_data, bobj):
         """Set Object parent and collection."""
         bobj.parent = func_data["parent_bobj"]
-        # print(
-        #     pre_line +
-        #     "'{}' set parent to '{}' "
-        #     "".format(bobj, func_data["parent_bobj"])
-        # )
+        print(
+            pre_line +
+            "'{}' set parent to '{}' "
+            "".format(bobj, func_data["parent_bobj"])
+        )
 
         # add object to current collection
         collection = func_data["collection"]
@@ -700,14 +701,14 @@ class ImportFcstd(object):
             "parent_empty_add_or_update: '{}'".format(empty_label)
         )
         pre_line = func_data["pre_line"] + " → "
-        empty_obj = None
+        empty_bobj = None
 
         obj = func_data["obj"]
 
-        # print(
-        #     pre_line + "current parent_obj ",
-        #     self.format_obj(func_data["parent_obj"])
-        # )
+        print(
+            pre_line + "current parent_obj ",
+            self.format_obj(func_data["parent_obj"])
+        )
 
         if empty_label in bpy.data.objects:
             # print(
@@ -715,10 +716,10 @@ class ImportFcstd(object):
             #     "'{}' already in objects list.".format(empty_label)
             # )
             if self.config["update"]:
-                empty_obj = bpy.data.objects[empty_label]
+                empty_bobj = bpy.data.objects[empty_label]
                 # print(
                 #     pre_line +
-                #     "update: '{}'".format(empty_obj)
+                #     "update: '{}'".format(empty_bobj)
                 # )
             else:
                 renamed_to = helper.rename_old_data(
@@ -732,18 +733,18 @@ class ImportFcstd(object):
                 )
 
         flag_new = False
-        if empty_obj is None:
-            # print(
-            #     pre_line +
-            #     "create new empty_obj '{}'".format(empty_label)
-            # )
-            empty_obj = bpy.data.objects.new(
+        if empty_bobj is None:
+            print(
+                pre_line +
+                "create new empty_bobj '{}'".format(empty_label)
+            )
+            empty_bobj = bpy.data.objects.new(
                 name=empty_label,
                 object_data=None
             )
-            empty_obj.empty_display_size = self.config["scale"] * 10
+            empty_bobj.empty_display_size = self.config["scale"] * 10
             self.set_obj_parent_and_collection(
-                pre_line, func_data, empty_obj)
+                pre_line, func_data, empty_bobj)
 
         if self.config["update"] or flag_new:
             # set position of empty
@@ -751,14 +752,14 @@ class ImportFcstd(object):
                 self.handle_placement(
                     pre_line,
                     obj,
-                    empty_obj,
+                    empty_bobj,
                 )
                 # NOT HERE.
                 # if not func_data["is_link"]:
                 #     self.handle_placement(
                 #         pre_line,
                 #         obj,
-                #         empty_obj,
+                #         empty_bobj,
                 #     )
                 #
                 # TODO: handle origin things corrrectly...
@@ -774,20 +775,20 @@ class ImportFcstd(object):
                 # ):
                 #     self.handle_placement(
                 #         obj,
-                #         empty_obj,
+                #         empty_bobj,
                 #     )
                 # print(
                 #     pre_line +
                 #     "'{}' set position"
-                #     "".format(empty_obj)
+                #     "".format(empty_bobj)
                 #     # "'{}' set position to '{}'"
-                #     # "".format(empty_obj, position)
+                #     # "".format(empty_bobj, position)
                 # )
 
         # update func_data links
         func_data["parent_obj"] = obj
-        func_data["parent_bobj"] = empty_obj
-        return empty_obj
+        func_data["parent_bobj"] = empty_bobj
+        return empty_bobj
 
     def create_collection_instance(
         self,
@@ -879,7 +880,7 @@ class ImportFcstd(object):
             obj_label = self.get_sub_obj_label(
                 pre_line,
                 func_data,
-                parent_obj,
+                # parent_obj,
                 obj
             )
             print(
@@ -893,9 +894,10 @@ class ImportFcstd(object):
         if is_link_source:
             link_source = obj
         # debug output
-        # print(pre_line + ("*"*42))
-        # print(pre_line + "obj:         " + self.format_obj(obj))
-        # print(pre_line + "parent_obj:  " + self.format_obj(parent_obj))
+        print(pre_line + ("*"*42))
+        print(pre_line + "obj:         " + self.format_obj(obj))
+        print(pre_line + "parent_obj:  " + self.format_obj(parent_obj))
+        print(pre_line + "parent_bobj:  {}".format(parent_bobj))
         # # print(pre_line + "func_data[is_link]:  {}".format(func_data["is_link"]))
         # is_link_color = b_helper.colors.fg.red
         # if func_data["is_link"]:
@@ -994,6 +996,8 @@ class ImportFcstd(object):
         #     "is_link_source '{}'"
         #     "".format(is_link_source)
         # )
+        print(pre_line + "parent_obj:  " + self.format_obj(parent_obj))
+        print(pre_line + "parent_bobj:  {}".format(parent_bobj))
         sub_objects = fc_helper.filtered_objects(
             sub_objects,
             include_only_visible=sub_filter_visible
@@ -1063,26 +1067,27 @@ class ImportFcstd(object):
         )
         # print(pre_line + "is_link_source '{}'".format(is_link_source))
         # pre_line += "→ "
-        # print(pre_line + "force update parent_bobj to match parent_obj")
-        p_label = self.get_obj_label(func_data["parent_obj"])
-        if (
-            func_data["parent_obj"]
-            and p_label in bpy.data.objects
-        ):
-            func_data["parent_bobj"] = bpy.data.objects[p_label]
 
-        # self.print_obj(
-        #     func_data["parent_obj"],
-        #     pre_line=pre_line + "# func_data[parent_obj]",
-        # )
-        # print(
-        #     pre_line + "# func_data[parent_bobj]",
-        #     func_data["parent_bobj"]
-        # )
+        # print(pre_line + "force update parent_bobj to match parent_obj")
+        # p_label = self.get_obj_label(func_data["parent_obj"])
+        # if (
+        #     func_data["parent_obj"]
+        #     and p_label in bpy.data.objects
+        # ):
+        #     func_data["parent_bobj"] = bpy.data.objects[p_label]
+
+        self.print_obj(
+            func_data["parent_obj"],
+            pre_line=pre_line + "# func_data[parent_obj]",
+        )
+        print(
+            pre_line + "# func_data[parent_bobj]",
+            func_data["parent_bobj"]
+        )
 
         self.parent_empty_add_or_update(func_data, parent_label)
         parent_bobj = func_data["parent_bobj"]
-        # print(pre_line + "fresh created parent_bobj ", parent_bobj)
+        print(pre_line + "fresh created parent_bobj ", parent_bobj)
 
         if len(sub_objects) > 0:
             self.handle__sub_objects(
