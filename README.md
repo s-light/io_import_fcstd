@@ -69,7 +69,7 @@ If no error message appears, everything is fine:
 
 this is currently only tested with 0.19 / daily-builds on linux 64bit.
 if you want to try, please use a FreeCAD build from
-[0.19_pre](https://github.com/FreeCAD/FreeCAD/releases/tag/0.19_pre)
+[0.19](https://github.com/FreeCAD/FreeCAD/releases/tag/0.19)
 or newer...
 
 
