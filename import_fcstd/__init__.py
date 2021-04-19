@@ -1968,6 +1968,10 @@ class ImportFcstd(object):
         import FreeCAD
 
         path_base = FreeCAD.getResourceDir()  # noqa
+        # https://wiki.freecadweb.org/PySide
+        # /usr/share/freecad-daily/Ext/PySide
+        path_mod = os.path.join(path_base, "Ext")
+        self.append_path(path_mod)
         path_mod = os.path.join(path_base, "Mod")
         self.append_path(path_mod, "Draft")
 
