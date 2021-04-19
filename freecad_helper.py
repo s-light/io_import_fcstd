@@ -4,6 +4,9 @@
 """Helper tools for FreeCAD python scripts."""
 
 
+# import blender_helper as b_helper
+
+
 def print_obj_header(
     pre_line="", show_lists=False, show_list_details=False,
 ):
@@ -12,12 +15,21 @@ def print_obj_header(
         pre_line + "{:<25} {:<15} {:<25}" "".format("Label", "Name", "TypeId"), end="",
     )
     if show_lists:
-        print("{:>2} {:>2} {:>2} {:>2}" "".format("P", "I", "O", "G",), end="")
+        print(
+            "{:>2} {:>2} {:>2} {:>2} {:>2}" "".format("P", "I", "O", "G", "H",), end=""
+        )
         if show_list_details:
             print(
-                ("    {:<10}" * 4).format(
-                    "[Parents]", "[InList]", "[OutList]", "[Group]", "[Hosts]"
+                ("    {:<30}" * 5).format(
+                    "[Parents]", "[InList]", "[OutList]", "[Group]", "[Hosts]",
                 ),
+                #     b_helper.colors.fg.lightblue + "[Parents]",
+                #     b_helper.colors.fg.lightred + "[InList]",
+                #     b_helper.colors.fg.yellow + "[OutList]",
+                #     b_helper.colors.fg.pink + "[Group]",
+                #     b_helper.colors.fg.lightgreen + "[Hosts]",
+                # )
+                # + b_helper.colors.reset,
                 end="",
             )
     print()
@@ -41,9 +53,16 @@ def format_obj_show_lists(obj, show_list_details):
         hosts = None
         if hasattr(obj, "Hosts"):
             hosts = obj.Hosts
-        result += ("    {:<10}" * 4).format(
+        result += ("    {:<30}" * 5).format(
             str(obj.Parents), str(obj.InList), str(obj.OutList), str(group), str(hosts),
         )
+        #     b_helper.colors.fg.lightblue + str(obj.Parents),
+        #     b_helper.colors.fg.lightred + str(obj.InList),
+        #     b_helper.colors.fg.yellow + str(obj.OutList),
+        #     b_helper.colors.fg.pink + str(group),
+        #     b_helper.colors.fg.lightgreen + str(hosts),
+        # ) + b_helper.colors.reset
+    return result
 
 
 def format_obj(
@@ -97,12 +116,18 @@ def print_objects(
         show_lists=show_lists,
         show_list_details=show_list_details,
     )
-    for obj in objects:
+    for index, obj in enumerate(objects):
+        # line_color = b_helper.colors.reset
+        # if index % 2:
+        #     # line_color = b_helper.colors.bg.lightgrey + b_helper.colors.fg.black
+        #     line_color = b_helper.colors.bg.black
         print_obj(
             obj,
             pre_line=pre_line + pre_list_entry,
+            # pre_line=pre_line + pre_list_entry + line_color,
             show_lists=show_lists,
             show_list_details=show_list_details,
+            # end=b_helper.colors.reset + "\n",
         )
 
 
