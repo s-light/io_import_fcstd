@@ -14,7 +14,8 @@ import importlib
 
 try:
     import bpy
-    print("\n"*2)
+
+    print("\n" * 2)
 except ModuleNotFoundError as e:
     print("Blender 'bpy' not available.", e)
     bpy = None
@@ -73,6 +74,7 @@ def append_freecad_path():
 try:
     append_freecad_path()
     import FreeCAD
+
     print("FreeCAD version:", FreeCAD.Version())
 except ModuleNotFoundError as e:
     print("FreeCAD import failed.", e)
@@ -86,6 +88,7 @@ except ModuleNotFoundError as e:
 
 
 import freecad_helper  # noqa
+
 importlib.reload(freecad_helper)
 
 
@@ -110,30 +113,29 @@ def start_test():
 
 
 def run_tests(doc):
-    print("~"*42)
+    print("~" * 42)
     objects = freecad_helper.get_filtered_objects(doc)
     print("get_filtered_objects", len(objects))
     freecad_helper.print_objects(objects)
 
-    print("~"*42)
+    print("~" * 42)
     objects = freecad_helper.get_root_objects(
-        doc,
-        filter_list=['Sketcher::SketchObject', ]
+        doc, filter_list=["Sketcher::SketchObject"]
     )
     print("get_root_objects", len(objects))
     freecad_helper.print_objects(objects)
 
-    print("~"*42)
+    print("~" * 42)
     objects = doc.RootObjects
     print("doc.RootObjects", len(objects))
     freecad_helper.print_objects(objects)
 
-    print("~"*42)
+    print("~" * 42)
     objects = freecad_helper.get_toplevel_objects(doc)
     print("get_toplevel_objects", len(objects))
     freecad_helper.print_objects(objects)
 
-    print("~"*42)
+    print("~" * 42)
     print("tests done :-)")
 
 
@@ -141,8 +143,8 @@ def run_tests(doc):
 def main_test():
     "Main Tests."
     if bpy:
-        print("\n"*2)
-    print("*"*42)
+        print("\n" * 2)
+    print("*" * 42)
     print("run import_tests")
 
     # Context Managers not implemented..
@@ -152,7 +154,10 @@ def main_test():
     docname = ""
     try:
         # filename_relative = "./dev/freecad_linking_example/assembly.FCStd"
-        filename_relative = "./dev/freecad_test_ParentChildPositions/TestParentChildPositions.FCStd"
+        # filename_relative = (
+        #     "./dev/freecad_test_ParentChildPositions/TestParentChildPositions.FCStd"
+        # )
+        filename_relative = "./dev/freecad_test_ArchWB/simple_wall_with_door.FCStd"
         print("FreeCAD document:", filename_relative)
         filename = os.path.join(base_dir, filename_relative)
         print("open file..")
@@ -168,10 +173,10 @@ def main_test():
     finally:
         if docname:
             FreeCAD.closeDocument(docname)
-        print("*"*42)
+        print("*" * 42)
         if bpy:
-            print("\n"*2)
+            print("\n" * 2)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main_test()
