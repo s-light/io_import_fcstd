@@ -179,15 +179,18 @@ def get_root_objects(doc, filter_list=[]):
     ]
     typeid_filter_list = typeid_filter_list + filter_list
     result_objects = []
+    result_objects_withHost = []
     for obj in doc.Objects:
         if obj.TypeId not in typeid_filter_list:
             if len(obj.Parents) == 0:
                 if hasattr(obj, "Hosts"):
                     if len(obj.Hosts) == 0:
                         result_objects.append(obj)
+                    else:
+                        result_objects_withHost.append(obj)
                 else:
                     result_objects.append(obj)
-    return result_objects
+    return result_objects, result_objects_withHost
 
 
 # ******************************************

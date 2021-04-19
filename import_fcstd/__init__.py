@@ -1860,7 +1860,9 @@ class ImportFcstd(object):
     def import_doc_content(self, doc):
         """Import document content = filterd objects."""
         pre_line = ""
-        obj_list = fc_helper.get_root_objects(doc, filter_list=self.typeid_filter_list)
+        obj_list, obj_list_withHost = fc_helper.get_root_objects(
+            doc, filter_list=self.typeid_filter_list
+        )
         print("-" * 21)
 
         self.config["report"](
@@ -1872,6 +1874,19 @@ class ImportFcstd(object):
             pre_line=pre_line,
         )
         fc_helper.print_objects(obj_list, show_lists=True, show_list_details=True)
+        print("-" * 21)
+
+        self.config["report"](
+            {"INFO"},
+            (
+                "found {} objects with Hosts attribute set in '{}'"
+                "".format(len(obj_list_withHost), self.doc_filename)
+            ),
+            pre_line=pre_line,
+        )
+        fc_helper.print_objects(
+            obj_list_withHost, show_lists=True, show_list_details=True
+        )
         print("-" * 21)
         # │─ ┌─ └─ ├─ ╞═ ╘═╒═
         # ║═ ╔═ ╚═ ╠═ ╟─

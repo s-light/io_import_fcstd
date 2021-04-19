@@ -116,14 +116,16 @@ def run_tests(doc):
     print("~" * 42)
     objects = freecad_helper.get_filtered_objects(doc)
     print("get_filtered_objects", len(objects))
-    freecad_helper.print_objects(objects)
+    freecad_helper.print_objects(objects, show_lists=True, show_list_details=True)
 
     print("~" * 42)
-    objects = freecad_helper.get_root_objects(
+    objects, objects_withHost = freecad_helper.get_root_objects(
         doc, filter_list=["Sketcher::SketchObject"]
     )
     print("get_root_objects", len(objects))
     freecad_helper.print_objects(objects)
+    print("get_root_objects withHost", len(objects_withHost))
+    freecad_helper.print_objects(objects_withHost)
 
     print("~" * 42)
     objects = doc.RootObjects
