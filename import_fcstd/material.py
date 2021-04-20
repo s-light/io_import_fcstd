@@ -109,9 +109,11 @@ class MaterialManager(object):
         self.report(
             b_helper.colors.fg.lightblue
             + "handle_material_per_face"
-            + b_helper.colors.reset
+            + b_helper.colors.reset,
+            pre_line="|  ",
         )
         rgba = self.get_obj_rgba(self.func_data["obj"].Name, material_index)
+        # get or create blender material
         bmat = None
         if self.sharemats:
             if rgba in self.func_data["matdatabase"]:
@@ -128,37 +130,65 @@ class MaterialManager(object):
             objmats.append(rgba)
             self.bobj.data.materials.append(bmat)
 
+        # at this point we should have a valid blender material
+
         self.report(
             b_helper.colors.fg.lightblue
             + "objmats "
             + b_helper.colors.reset
-            + "{}".format(objmats)
+            + "{}".format(objmats),
+            pre_line="|  ",
         )
         self.report(
             b_helper.colors.fg.lightblue
             + "bmat "
             + b_helper.colors.reset
-            + "{}".format(bmat)
+            + "{}".format(bmat),
+            pre_line="|  ",
         )
         self.report(
             b_helper.colors.fg.lightblue
             + "face_index "
             + b_helper.colors.reset
-            + "{}".format(face_index)
+            + "{}".format(face_index),
+            pre_line="|  ",
         )
+
         # assigne materials to polygons
+        objmats_index = objmats.index(rgba)
+        self.report(
+            b_helper.colors.fg.lightblue
+            + "objmats_index "
+            + b_helper.colors.reset
+            + "{}".format(objmats_index),
+            pre_line="|  ",
+        )
+        self.report(
+            b_helper.colors.fg.lightblue
+            + 'self.func_data["matindex"][material_index] '
+            + b_helper.colors.reset
+            + "{}".format(self.func_data["matindex"][material_index]),
+            pre_line="|  ",
+        )
+
         for fj in range(self.func_data["matindex"][material_index]):
             self.report(
                 b_helper.colors.fg.lightblue
                 + "fj "
                 + b_helper.colors.reset
                 + "{}".format(fj),
-                pre_line="| ",
+                pre_line="|  * ",
             )
-            self.bobj.data.polygons[face_index + fj].material_index = objmats.index(
-                rgba
+            self.report(
+                b_helper.colors.fg.lightblue
+                + "face_index + fj "
+                + b_helper.colors.reset
+                + "{}".format(face_index + fj),
+                pre_line="|  * ",
             )
+            self.bobj.data.polygons[face_index + fj].material_index = objmats_index
         face_index += self.func_data["matindex"][material_index]
+        return face_index
 
     def handle_material_multi(self):
         """Handle multi material."""
@@ -166,12 +196,15 @@ class MaterialManager(object):
         self.report(
             b_helper.colors.fg.lightgreen
             + "handle_material_multi"
-            + b_helper.colors.reset
+            + b_helper.colors.reset,
+            pre_line="|  ",
         )
         face_index = 0
         objmats = []
         for material_index in range(len(self.func_data["matindex"])):
-            self.handle_material_per_face(face_index, objmats, material_index)
+            face_index = self.handle_material_per_face(
+                face_index, objmats, material_index
+            )
 
     def handle_material_single(self):
         """Handle single material."""
@@ -229,6 +262,23 @@ class MaterialManager(object):
                 self.report("  {:>3} {}".format(index, color))
             # ############
 
+            self.report(
+                b_helper.colors.fg.lightblue
+                + "self.bobj.data.polygons "
+                + b_helper.colors.reset
+                + "{}".format(self.bobj.data.polygons)
+            )
+
+            # create a list with all faces
+            face_list = [face for face in self.bobj.data.polygons]
+            self.report(
+                b_helper.colors.fg.lightblue + "face_list " + b_helper.colors.reset
+            )
+            for index, face in enumerate(face_list):
+                self.report("  {:>3} {}".format(index, face))
+            # ############
+
+            # check for multi material
             if (
                 self.func_data["matindex"]
                 and ("DiffuseColor" in self.guidata[self.func_data["obj"].Name])
