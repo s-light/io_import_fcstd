@@ -1015,6 +1015,34 @@ class ImportFcstd(object):
                 pre_line=pre_line,
             )
 
+    def handle__object_hosts(self, func_data):
+        """Handle object with hosts attribute (Arch Workbench)."""
+        pre_line = func_data["pre_line"]
+        obj = func_data["obj"]
+        obj_host = obj.Hosts[0]
+        obj_label = self.get_obj_label(obj)
+        obj_host_label = self.get_obj_label(obj_host)
+        print(pre_line + "handle__object_hosts '{}'".format(obj_label))
+        print(pre_line + "obj_host_label '{}'".format(obj_host_label))
+        bobj = func_data["bobj"]
+        bobj_host = bpy.data.objects[obj_host_label]
+        if bobj_host:
+            print(pre_line + "bobj_host '{}'".format(bobj_host))
+            print(pre_line + "bobj_host.parent '{}'".format(bobj_host.parent))
+            # Arch Wall Objects are no collection things - so we need to use the parent of it...
+            # in the hope that this works...
+            if bobj_host.parent:
+                bobj.parent = bobj_host.parent
+            else:
+                self.config["report"](
+                    {"WARNING"},
+                    (
+                        "Warning: host '{}' has no parrent. can not set parent for '{}' "
+                        "".format(obj_host_label, obj_label)
+                    ),
+                    pre_line,
+                )
+
     # ##########################################
     # Arrays and similar
     def handle__ObjectWithElementList(self, func_data, is_link_source=False):
@@ -1801,6 +1829,18 @@ class ImportFcstd(object):
                 ),
                 pre_line,
             )
+        elif obj.isDerivedFrom("Part::FeaturePython") and hasattr(obj, "Hosts"):
+            self.handle__PartFeature(func_data)
+            self.config["report"](
+                {"WARNING"},
+                (
+                    "EXPERIMENTAL import of '{}' ('{}') of type '{}'. "
+                    "(Type Not implemented yet)."
+                    "".format(obj.Label, obj.Name, obj.TypeId)
+                ),
+                pre_line,
+            )
+            self.handle__object_hosts(func_data)
         elif obj.isDerivedFrom("Part::Feature"):
             self.handle__PartFeature(func_data)
         elif obj.isDerivedFrom("Mesh::Feature"):
@@ -1888,6 +1928,14 @@ class ImportFcstd(object):
             obj_list_withHost, show_lists=True, show_list_details=True
         )
         print("-" * 21)
+        self.config["report"](
+            {"INFO"},
+            ("the Hosts ARCH way is not implemented yet. so we just import them."),
+            pre_line=pre_line,
+        )
+        obj_list.extend(obj_list_withHost)
+        fc_helper.print_objects(obj_list, show_lists=True)
+        print("-" * 21)
         # │─ ┌─ └─ ├─ ╞═ ╘═╒═
         # ║═ ╔═ ╚═ ╠═ ╟─
         # ┃━ ┏━ ┗━ ┣━ ┠─
@@ -1906,6 +1954,12 @@ class ImportFcstd(object):
                 self.import_obj(
                     func_data=func_data_new, pre_line=pre_line_follow,
                 )
+                if obj in obj_list_withHost:
+                    self.config["report"](
+                        {"INFO"},
+                        ("TODO: handle Hosts [{}] of obj '{}'").format(obj.Hosts, obj),
+                        pre_line=pre_line_follow,
+                    )
             else:
                 self.print_obj(
                     obj=obj,
@@ -1996,6 +2050,7 @@ class ImportFcstd(object):
 
             # import PartDesign  # noqa
             import Draft  # noqa
+            import Arch  # noqa
         except ModuleNotFoundError as e:
             self.config["report"](
                 {"ERROR"},
