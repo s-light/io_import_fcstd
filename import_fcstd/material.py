@@ -102,7 +102,7 @@ class MaterialManager(object):
             self.func_data["matdatabase"][rgba] = bmat
         return bmat
 
-    def handle_material_per_face(self, fi, objmats, material_index):
+    def handle_material_per_face(self, face_index, objmats, material_index):
         """Handle material for face."""
         # Create new mats and attribute faces to them
         # DiffuseColor stores int values, Blender use floats
@@ -142,9 +142,9 @@ class MaterialManager(object):
         )
         self.report(
             b_helper.colors.fg.lightblue
-            + "fi "
+            + "face_index "
             + b_helper.colors.reset
-            + "{}".format(fi)
+            + "{}".format(face_index)
         )
         # assigne materials to polygons
         for fj in range(self.func_data["matindex"][material_index]):
@@ -155,8 +155,10 @@ class MaterialManager(object):
                 + "{}".format(fj),
                 pre_line="| ",
             )
-            self.bobj.data.polygons[fi + fj].material_index = objmats.index(rgba)
-        fi += self.func_data["matindex"][material_index]
+            self.bobj.data.polygons[face_index + fj].material_index = objmats.index(
+                rgba
+            )
+        face_index += self.func_data["matindex"][material_index]
 
     def handle_material_multi(self):
         """Handle multi material."""
@@ -166,18 +168,10 @@ class MaterialManager(object):
             + "handle_material_multi"
             + b_helper.colors.reset
         )
-        fi = 0
+        face_index = 0
         objmats = []
-        for material_index in self.func_data["matindex"]:
-            material_index
-            self.report(
-                b_helper.colors.fg.lightblue
-                + "material_index "
-                + b_helper.colors.reset
-                + "{}".format(material_index)
-            )
-        for i in range(len(self.func_data["matindex"])):
-            self.handle_material_per_face(fi, objmats, i)
+        for material_index in range(len(self.func_data["matindex"])):
+            self.handle_material_per_face(face_index, objmats, material_index)
 
     def handle_material_single(self):
         """Handle single material."""
@@ -213,42 +207,28 @@ class MaterialManager(object):
             self.report(
                 b_helper.colors.bold
                 + b_helper.colors.fg.lightblue
-                + 'self.func_data["matindex"] '
+                + 'self.func_data["matindex"]'
+                + "  ({}):  ".format(len(self.func_data["matindex"]))
                 + b_helper.colors.reset
                 + "{}".format(self.func_data["matindex"])
             )
+            # ############
+            # list colors:
             self.report(
                 b_helper.colors.bold
                 + b_helper.colors.fg.lightblue
                 + 'self.guidata[self.func_data["obj"].Name]["DiffuseColor"]'
+                + "  ({}):".format(
+                    len(self.guidata[self.func_data["obj"].Name]["DiffuseColor"])
+                )
                 + b_helper.colors.reset
-                + " {}".format(self.guidata[self.func_data["obj"].Name]["DiffuseColor"])
             )
-            # self.report(
-            #     b_helper.colors.bold
-            #     + b_helper.colors.fg.lightblue
-            #     + '("DiffuseColor" in self.guidata[self.func_data["obj"].Name])'
-            #     + b_helper.colors.reset
-            #     + " {}".format(
-            #         ("DiffuseColor" in self.guidata[self.func_data["obj"].Name])
-            #     )
-            # )
-            self.report(
-                b_helper.colors.bold
-                + b_helper.colors.fg.lightblue
-                + 'len(self.func_data["matindex"])'
-                + b_helper.colors.reset
-                + " {}".format(len(self.func_data["matindex"]))
-            )
-            # self.report(
-            #     b_helper.colors.bold
-            #     + b_helper.colors.fg.lightblue
-            #     + 'len(self.guidata[self.func_data["obj"].Name]["DiffuseColor"])'
-            #     + b_helper.colors.reset
-            #     + " {}".format(
-            #         len(self.guidata[self.func_data["obj"].Name]["DiffuseColor"])
-            #     )
-            # )
+            for index, color in enumerate(
+                self.guidata[self.func_data["obj"].Name]["DiffuseColor"]
+            ):
+                self.report("  {:>3} {}".format(index, color))
+            # ############
+
             if (
                 self.func_data["matindex"]
                 and ("DiffuseColor" in self.guidata[self.func_data["obj"].Name])
