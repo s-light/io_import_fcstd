@@ -68,13 +68,13 @@ If no error message appears, everything is fine:
 # warning
 
 this is currently only tested with 0.19 / daily-builds on linux 64bit.
-if you want to try, please use a FreeCAD build from
-[0.19](https://github.com/FreeCAD/FreeCAD/releases/tag/0.19)
+if you want to try, please use a FreeCAD build
+[v0.19](https://github.com/FreeCAD/FreeCAD/releases)
 or newer...
 
 
 # TODO
-see the issues for open points.
+see the [issues for open points](https://github.com/s-light/io_import_fcstd/issues).
 
 - support PartDesign
 - support clones
