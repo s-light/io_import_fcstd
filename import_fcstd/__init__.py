@@ -6,6 +6,8 @@
 import sys
 import bpy
 import os
+import math
+
 # import pprint
 
 from .. import freecad_helper as fc_helper
@@ -13,7 +15,7 @@ from .. import blender_helper as b_helper
 
 from . import helper
 from . import guidata
-from . material import MaterialManager
+from .material import MaterialManager
 
 
 # set to True to triangulate all faces (will loose multimaterial info)
@@ -25,11 +27,15 @@ class ImportFcstd(object):
 
     def __init__(
         self,
+        *,  # this forces named_properties..
         # filename=None,
         update=True,
+        update_only_modified_meshes=True,
         placement=True,
         scale=0.001,
-        tessellation=1.0,
+        tessellation=0.10,
+        auto_smooth_use=True,
+        auto_smooth_angle=math.radians(85),
         skiphidden=True,
         filter_sketch=True,
         sharemats=True,
@@ -38,15 +44,19 @@ class ImportFcstd(object):
         obj_name_prefix_with_filename=False,
         links_as_collectioninstance=True,
         path_to_freecad=None,
-        report=None
+        path_to_system_packages=None,
+        report=None,
     ):
         """Init."""
         super(ImportFcstd, self).__init__()
         self.config = {
             "filename": None,
             "update": update,
+            "update_only_modified_meshes": update_only_modified_meshes,
             "placement": placement,
             "tessellation": tessellation,
+            "auto_smooth_use": auto_smooth_use,
+            "auto_smooth_angle": auto_smooth_angle,
             "skiphidden": skiphidden,
             "filter_sketch": filter_sketch,
             "scale": scale,
@@ -58,9 +68,10 @@ class ImportFcstd(object):
             "report": self.print_report,
         }
         self.path_to_freecad = path_to_freecad
+        self.path_to_system_packages = path_to_system_packages
         self.report = report
 
-        print('config', self.config)
+        print("config", self.config)
         self.doc = None
         self.doc_filename = None
         self.guidata = {}
@@ -69,35 +80,43 @@ class ImportFcstd(object):
         self.link_targets = None
         self.fcstd_empty = None
 
+        self.imported_obj_names = []
+
         self.typeid_filter_list = [
-            'GeoFeature',
-            'PartDesign::CoordinateSystem',
+            "GeoFeature",
+            "PartDesign::CoordinateSystem",
         ]
-        if self.config['filter_sketch']:
-            self.typeid_filter_list.append('Sketcher::SketchObject')
+        if self.config["filter_sketch"]:
+            self.typeid_filter_list.append("Sketcher::SketchObject")
 
     def print_report(self, mode, data, pre_line=""):
         """Multi print handling."""
         b_helper.print_multi(
-            mode=mode,
-            data=data,
-            pre_line=pre_line,
-            report=self.report,
+            mode=mode, data=data, pre_line=pre_line, report=self.report,
         )
+
+    def format_obj(self, obj, pre_line="", post_line=""):
+        """Print object with nice formating."""
+        message = ""
+
+        message = fc_helper.format_obj(
+            obj=obj,
+            pre_line=pre_line,
+            show_lists=False,
+            show_list_details=False,
+            tight_format=True,
+        )
+        message += post_line
+        return message
 
     def print_obj(self, obj, pre_line="", post_line="", end="\n"):
         """Print object with nice formating."""
-        message = (
-            "'{}' ('{}' <{}>)"
-            "".format(obj.Label, obj.Name, obj.TypeId)
-            + post_line
-        )
+        message = ""
+
+        message = self.format_obj(obj=obj)
+        message += post_line
         # print(message, end=end)
-        self.config["report"](
-            {'INFO'},
-            message,
-            pre_line
-        )
+        self.config["report"]({"INFO"}, message, pre_line)
 
     def handle_label_prefix(self, label):
         """Handle all label prefix processing."""
@@ -140,13 +159,69 @@ class ImportFcstd(object):
 
     def get_obj_combined_label(self, parent_obj, obj):
         """Get object label with optional prefix."""
-        label = (
-            parent_obj.Label
-            + "__"
-            + obj.Label
-        )
+        label = None
+        obj_label = "NONE"
+        parent_obj_label = "NONE"
+        if obj:
+            obj_label = obj.Label
+        if parent_obj:
+            parent_obj_label = parent_obj.Label
+        label = parent_obj_label + "." + obj_label
         label = self.handle_label_prefix(label)
         return label
+
+    # def get_sub_obj_label(self, pre_line, func_data, parent_obj, obj):
+    def get_sub_obj_label(self, pre_line, func_data, obj):
+        """Get sub object label."""
+        # print(
+        #     pre_line
+        #     + "get_sub_obj_label"
+        # )
+        # pre_line += ". "
+        # print(
+        #     pre_line
+        #     + "func_data['obj_label']: "
+        #     + b_helper.colors.fg.orange
+        #     + "'{}'".format(func_data["obj_label"])
+        #     + b_helper.colors.reset
+        # )
+        # print(
+        #     pre_line
+        #     + "func_data['link_source']: "
+        #     + b_helper.colors.fg.orange
+        #     + self.format_obj(func_data["link_source"])
+        #     + b_helper.colors.reset
+        # )
+        # print(
+        #     pre_line
+        #     + "parent_obj              "
+        #     + b_helper.colors.fg.orange
+        #     + self.format_obj(parent_obj)
+        #     + b_helper.colors.reset
+        # )
+        # print(
+        #     pre_line
+        #     + "       obj              "
+        #     + b_helper.colors.fg.orange
+        #     + self.format_obj(obj)
+        #     + b_helper.colors.reset
+        # )
+        # obj_label = self.get_obj_combined_label(parent_obj, obj)
+        # if func_data["obj_label"]:
+        #     obj_label = (
+        #         func_data["obj_label"]
+        #         + "."
+        #         + obj_label
+        #     )
+        obj_label = self.get_obj_label(obj)
+        if func_data["link_source"]:
+            obj_label = (
+                # func_data["obj_label"]
+                self.get_obj_label(func_data["link_source"])
+                + "."
+                + obj_label
+            )
+        return obj_label
 
     def fix_link_target_name(self, bobj):
         """Fix name of link target object."""
@@ -156,10 +231,7 @@ class ImportFcstd(object):
     def check_obj_visibility(self, obj):
         """Check if obj is visible."""
         result = True
-        if (
-            obj.Name in self.guidata
-            and "Visibility" in self.guidata[obj.Name]
-        ):
+        if obj.Name in self.guidata and "Visibility" in self.guidata[obj.Name]:
             if self.guidata[obj.Name]["Visibility"] is False:
                 result = False
         return result
@@ -175,12 +247,23 @@ class ImportFcstd(object):
                 result = self.check_obj_visibility(obj)
         return result
 
+    def check_collections_for_bobj(self, bobj):
+        """Search all collections for given bobj."""
+        found_in_collections = None
+        for col in bpy.data.collections:
+            if bobj.name in col.objects:
+                if found_in_collections is None:
+                    found_in_collections = []
+                found_in_collections.append(col.name)
+        return found_in_collections
+
     # ##########################################
     # object handling
 
     def hascurves(self, shape):
         """Check if shape has curves."""
         import Part
+
         for e in shape.Edges:
             if not isinstance(e.Curve, (Part.Line, Part.LineSegment)):
                 return True
@@ -188,18 +271,20 @@ class ImportFcstd(object):
 
     def handle_placement(
         self,
-        # pre_line,
+        pre_line,
         obj,
         bobj,
-        enable_import_scale=True,
+        # enable_import_scale=False,
         enable_scale=True,
         relative=False,
         negative=False,
     ):
         """Handle placement."""
         if self.config["placement"]:
-            # print ("placement:",placement)
-            new_loc = (obj.Placement.Base * self.config["scale"])
+            # print(pre_line)
+            # print(pre_line + "   §§§   §§§   handle_placement: '{}'".format(bobj.name))
+            # print(pre_line)
+            new_loc = obj.Placement.Base * self.config["scale"]
             # attention: multiply does in-place change.
             # so if you call it multiple times on the same value
             # you get really strange results...
@@ -224,21 +309,12 @@ class ImportFcstd(object):
             else:
                 bobj.location = new_loc
             m = bobj.rotation_mode
-            bobj.rotation_mode = 'QUATERNION'
+            bobj.rotation_mode = "QUATERNION"
             if obj.Placement.Rotation.Angle:
                 # FreeCAD Quaternion is XYZW while Blender is WXYZ
-                q = (
-                    (obj.Placement.Rotation.Q[3], )
-                    + obj.Placement.Rotation.Q[:3]
-                )
-                bobj.rotation_quaternion = (q)
+                q = (obj.Placement.Rotation.Q[3],) + obj.Placement.Rotation.Q[:3]
+                bobj.rotation_quaternion = q
                 bobj.rotation_mode = m
-            if enable_import_scale:
-                bobj.scale = (
-                    self.config["scale"],
-                    self.config["scale"],
-                    self.config["scale"]
-                )
             if enable_scale and ("Scale" in obj.PropertiesList):
                 # object has Scale property so lets use it :-)
                 bobj.scale = bobj.scale * obj.Scale
@@ -253,105 +329,272 @@ class ImportFcstd(object):
         """Update object tree."""
         pre_line = func_data["pre_line"]
         bobj = func_data["bobj"]
+        # col = self.check_collections_for_bobj(bobj)
         if func_data["collection"]:
             add_to_collection = False
-            if self.config['update']:
+            if self.config["update"]:
                 if bobj.name not in func_data["collection"].objects:
                     add_to_collection = True
                 else:
-                    print(
-                        pre_line +
-                        "'{}' already in collection '{}'"
-                        "".format(bobj.name, func_data["collection"])
-                    )
+                    # print(
+                    #     pre_line +
+                    #     "'{}' already in collection '{}'"
+                    #     "".format(bobj.name, func_data["collection"])
+                    # )
+                    pass
             else:
                 add_to_collection = True
 
             if add_to_collection:
                 func_data["collection"].objects.link(bobj)
-                print(
-                    pre_line +
-                    "'{}' add to '{}' "
-                    "".format(bobj, func_data["collection"])
-                )
+                # print(
+                #     pre_line +
+                #     "'{}' add (tree_collections) to  '{}' "
+                #     "".format(bobj, func_data["collection"])
+                # )
+        if not self.check_collections_for_bobj(bobj):
+            # link to import collection - so that the object is visible.
+            collection = self.fcstd_collection
+            collection.objects.link(bobj)
+            print(
+                pre_line + "'{}' add (tree_parents) to '{}' "
+                "".format(bobj, collection)
+            )
 
     def update_tree_parents(self, func_data):
         """Update object tree."""
         pre_line = func_data["pre_line"]
         bobj = func_data["bobj"]
-        if (
-            bobj.parent is None
-            and func_data["bobj_parent"] is not None
-        ):
-            bobj.parent = func_data["bobj_parent"]
+        if bobj.parent is None and func_data["parent_bobj"] is not None:
+            bobj.parent = func_data["parent_bobj"]
             print(
-                pre_line +
-                "'{}' set parent to '{}' "
-                "".format(bobj, func_data["bobj_parent"])
+                pre_line + "update_tree_parents: '{}' set parent to '{}' "
+                "".format(bobj, func_data["parent_bobj"])
             )
             # TODO: check 'update'
 
-    def create_bobj_from_bmesh(self, func_data, bmesh):
+    def create_bmesh_from_func_data(
+        self, func_data, obj_label, enable_import_scale=True
+    ):
         """Create new object from bmesh."""
-        obj_label = self.get_obj_label(func_data["obj"])
+        bmesh = bpy.data.meshes.new(name=obj_label)
+        bmesh.from_pydata(func_data["verts"], func_data["edges"], func_data["faces"])
+        bmesh.update()
+        # handle import scalling
+        if enable_import_scale:
+            scale = self.config["scale"]
+            for v in bmesh.vertices:
+                v.co *= scale
+        bmesh.update()
+        bmesh["freecad_mesh_hash"] = func_data["freecad_mesh_hash"]
+        return bmesh
+
+    def create_bobj_from_bmesh(self, func_data, obj_label, bmesh):
+        """Create new object from bmesh."""
         bobj = bpy.data.objects.new(obj_label, bmesh)
-        self.handle_placement(func_data["obj"], bobj)
-        material_manager = MaterialManager(
-            guidata=self.guidata,
-            func_data=func_data,
-            bobj=bobj,
-            obj_label=obj_label,
-            sharemats=self.config["sharemats"]
-        )
-        material_manager.create_new()
+        # check if we already used the bmesh.
+        # if bmesh.name in bpy.data.meshes:
+        #     print(
+        #         func_data["pre_line"] +
+        #         " ignore material import. mesh already existed."
+        #     )
+        # else:
+        if len(bmesh.materials) <= 0:
+            material_manager = MaterialManager(
+                guidata=self.guidata,
+                func_data=func_data,
+                bobj=bobj,
+                obj_label=obj_label,
+                sharemats=self.config["sharemats"],
+                report=self.config["report"],
+                report_preline=func_data["pre_line"] + "| ",
+            )
+            material_manager.create_new()
+        else:
+            print(
+                func_data["pre_line"]
+                + " ignore material import. mesh already has material."
+            )
         func_data["bobj"] = bobj
         return bobj
 
-    def add_or_update_blender_obj(self, func_data):
-        """Create or update object with mesh and material data."""
-        pre_line = func_data["pre_line"]
-        bobj = None
-        obj_label = self.get_obj_label(func_data["obj"])
-        if self.config["update"]:
-            # locate existing object (object with same name)
-            if obj_label in bpy.data.objects:
-                bobj = bpy.data.objects[obj_label]
-                print(
-                    pre_line +
-                    "Replacing existing object mesh: {}"
-                    "".format(obj_label)
-                )
+    def create_or_get_bmesh(self, pre_line, func_data, mesh_label):
+        """Create or get bmesh."""
+        pre_line_orig = func_data["pre_line"]
+        print(pre_line_orig + "create_or_get_bmesh")
+        pre_line = pre_line_orig + "  "
+        func_data["pre_line"] = pre_line
+
+        bmesh = None
+        # bmesh_old_name = None
+        bmesh_import = True
+
+        print(pre_line + "mesh_label:", mesh_label)
+        # print(pre_line + "bpy.data.meshes ({})".format(len(bpy.data.meshes)))
+        # for mesh in bpy.data.meshes:
+        #     print(pre_line + " - ", mesh)
+        if mesh_label in bpy.data.meshes:
+            bmesh = bpy.data.meshes[mesh_label]
+            print(pre_line + "use found bmesh.")
+            bmesh_import = False
+            # print(
+            #     pre_line
+            #     + "bmesh.freecad_mesh_hash ",
+            #     bmesh.get("freecad_mesh_hash", None)
+            # )
+            # print(
+            #     pre_line
+            #     + "func_data[freecad_mesh_hash] ",
+            #     func_data["freecad_mesh_hash"]
+            # )
+            # print(pre_line + "mesh_label", mesh_label)
+            # print(pre_line + "self.imported_obj_names")
+            # for obj_name in self.imported_obj_names:
+            #     print(pre_line + " - ", obj_name)
+            if mesh_label not in self.imported_obj_names and self.config["update"]:
+                if self.config["update_only_modified_meshes"]:
+                    print(pre_line + "update_only_modified_meshes: TODO")
+                    # bmesh.get("freecad_mesh_hash", None)
+                    # func_data["freecad_mesh_hash"]
                 # rename old mesh -
                 # this way the new mesh can get the original name.
-                helper.rename_old_data(bpy.data.meshes, obj_label)
-
-        bmesh = bpy.data.meshes.new(name=obj_label)
-        bmesh.from_pydata(
-            func_data["verts"],
-            func_data["edges"],
-            func_data["faces"]
-        )
-        bmesh.update()
-        if bobj:
-            # update only the mesh of existing object.
-            # copy old materials to new mesh:
-            for mat in bobj.data.materials:
-                bmesh.materials.append(mat)
-            bobj.data = bmesh
-            # self.handle_material_update(func_data, bobj)
-        else:
-            bobj = self.create_bobj_from_bmesh(
-                func_data,
-                bmesh
+                helper.rename_old_data(bpy.data.meshes, mesh_label)
+                # bmesh_old_name = helper.rename_old_data(bpy.data.meshes, mesh_label)
+                bmesh_import = True
+        # create bmesh
+        if bmesh_import:
+            print(pre_line + "import bmesh.")
+            bmesh = self.create_bmesh_from_func_data(
+                func_data, mesh_label, enable_import_scale=True
             )
+            # print(pre_line + "create_bmesh_from_func_data: ", bmesh)
+            print(
+                pre_line + "set auto_smooth: ({}) '{}°'"
+                "".format(
+                    self.config["auto_smooth_use"],
+                    math.degrees(self.config["auto_smooth_angle"]),
+                )
+            )
+            bmesh.use_auto_smooth = self.config["auto_smooth_use"]
+            bmesh.auto_smooth_angle = self.config["auto_smooth_angle"]
+            if self.config["auto_smooth_use"]:
+                for f in bmesh.polygons:
+                    f.use_smooth = True
+            if mesh_label not in self.imported_obj_names:
+                self.imported_obj_names.append(mesh_label)
+        # return (bmesh, bmesh_old_name)
+        func_data["pre_line"] = pre_line_orig
+        return bmesh
 
+    def create_or_update_bobj(self, pre_line, func_data, obj_label, bmesh):
+        """Create or update bobj."""
+        pre_line_orig = func_data["pre_line"]
+        print(pre_line_orig + "create_or_update_bobj")
+        pre_line = pre_line_orig + "  "
+        func_data["pre_line"] = pre_line
+        bobj = None
+        is_new = False
+        bobj_import = True
+        # locate existing object (object with same name)
+        if obj_label in bpy.data.objects:
+            bobj = bpy.data.objects[obj_label]
+            print(pre_line + "found bobj!")
+            bobj_import = False
+            if obj_label not in self.imported_obj_names and self.config["update"]:
+                print(
+                    pre_line + "Replacing existing object mesh: {}" "".format(obj_label)
+                )
+                # update only the mesh of existing object.
+                # print(self.imported_obj_names)
+                if len(bmesh.materials) <= 0:
+                    # TODO: fix this!!
+                    # correctly handle multimaterials
+                    # copy old materials to new mesh:
+                    for mat in bobj.data.materials:
+                        bmesh.materials.append(mat)
+                bobj.data = bmesh
+                # self.handle_material_update(func_data, bobj)
+                bobj_import = False
+        # create bobj
+        if bobj_import:
+            # print(
+            #     pre_line +
+            #     "create_bobj_from_bmesh: '{}'"
+            #     "".format(obj_label)
+            # )
+            bobj = self.create_bobj_from_bmesh(func_data, obj_label, bmesh)
+            is_new = True
+            # print(
+            #     pre_line +
+            #     "created new bobj: {}"
+            #     "".format(bobj)
+            # )
+        func_data["pre_line"] = pre_line_orig
+        return (is_new, bobj)
+
+    def add_or_update_blender_obj(self, func_data):
+        """Create or update object with mesh and material data."""
+        """
+            What should happen?
+                check if we have the mesh already
+                if not create
+                check if we have the object already
+                if not create it
+        """
+        pre_line_orig = func_data["pre_line"]
+        print(pre_line_orig + "add_or_update_blender_obj")
+        pre_line = pre_line_orig + "  "
+        func_data["pre_line"] = pre_line
+
+        obj_label = self.get_obj_label(func_data["obj"])
+        mesh_label = obj_label
+        if func_data["is_link"] and func_data["obj_label"]:
+            obj_label = func_data["obj_label"]
+
+        # print(pre_line + "obj_label", obj_label)
+        # print(pre_line + "mesh_label", mesh_label)
+        # print(pre_line + "obj", self.format_obj(func_data["obj"]))
+
+        bmesh = self.create_or_get_bmesh(pre_line, func_data, mesh_label)
+
+        is_new, bobj = self.create_or_update_bobj(pre_line, func_data, obj_label, bmesh)
+
+        if self.config["update"] or is_new:
+            # if func_data["obj"].isDerivedFrom("Part::Feature"):
+            #     print(pre_line + "       obj isDerivedFrom Part::Feature")
+            # if func_data["obj"].isDerivedFrom("App::Part"):
+            #     print(pre_line + "       obj isDerivedFrom App::Part")
+            # if func_data["parent_obj"].isDerivedFrom("Part::Feature"):
+            #     print(pre_line + "parent_obj isDerivedFrom Part::Feature")
+            # if func_data["parent_obj"].isDerivedFrom("App::Part"):
+            #     print(pre_line + "parent_obj isDerivedFrom App::Part")
+
+            if func_data["is_link"]:
+                # print(pre_line + "is link")
+                if func_data["obj"].isDerivedFrom("Part::Feature") and func_data[
+                    "parent_obj"
+                ].isDerivedFrom("App::Part"):
+                    # print(
+                    #     pre_line +
+                    #     "is_link "
+                    #     "&& obj is Part::Feature "
+                    #     "&& parent_obj is App::Part "
+                    # )
+                    self.handle_placement(pre_line, func_data["obj"], bobj)
+            else:
+                # print(pre_line + "is not link")
+                self.handle_placement(pre_line, func_data["obj"], bobj)
+
+        if bobj.name not in self.imported_obj_names:
+            self.imported_obj_names.append(bobj.name)
         func_data["bobj"] = bobj
+        func_data["pre_line"] = pre_line_orig
 
     def sub_collection_add_or_update(self, func_data, collection_label):
         """Part-Collection handle add or update."""
         print(
-            func_data["pre_line"] +
-            "sub_collection_add_or_update: '{}'".format(collection_label)
+            func_data["pre_line"]
+            + "sub_collection_add_or_update: '{}'".format(collection_label)
         )
         temp_collection = None
         if self.config["update"]:
@@ -365,12 +608,8 @@ class ImportFcstd(object):
             temp_collection = bpy.data.collections.new(collection_label)
             func_data["collection"].children.link(temp_collection)
             print(
-                func_data["pre_line"] +
-                "'{}' add to '{}' "
-                "".format(
-                    func_data["bobj"],
-                    func_data["collection"],
-                )
+                func_data["pre_line"] + "'{}' add to '{}' "
+                "".format(func_data["bobj"], func_data["collection"],)
             )
         else:
             # bpy.context.scene.collection.children.link(self.fcstd_collection)
@@ -382,11 +621,10 @@ class ImportFcstd(object):
 
     def set_obj_parent_and_collection(self, pre_line, func_data, bobj):
         """Set Object parent and collection."""
-        bobj.parent = func_data["bobj_parent"]
+        bobj.parent = func_data["parent_bobj"]
         print(
-            pre_line +
-            "'{}' set parent to '{}' "
-            "".format(bobj, func_data["bobj_parent"])
+            pre_line + "'{}' set parent to '{}' "
+            "".format(bobj, func_data["parent_bobj"])
         )
 
         # add object to current collection
@@ -395,197 +633,426 @@ class ImportFcstd(object):
             collection = self.fcstd_collection
         if bobj.name not in collection.objects:
             collection.objects.link(bobj)
-            print(
-                pre_line +
-                "'{}' add to '{}' "
-                "".format(bobj, collection)
-            )
+            # print(
+            #     pre_line +
+            #     "'{}' add to '{}' "
+            #     "".format(bobj, collection)
+            # )
 
-    def parent_empty_add_or_update(self, func_data, parent_label):
+    def parent_empty_add_or_update(self, func_data, empty_label):
         """Parent Empty handle add or update."""
         print(
-            func_data["pre_line"] +
-            "parent_empty_add_or_update: '{}'".format(parent_label)
+            func_data["pre_line"]
+            + "parent_empty_add_or_update: '{}'".format(empty_label)
         )
         pre_line = func_data["pre_line"] + " → "
-        parent_empty = None
+        empty_bobj = None
 
         obj = func_data["obj"]
 
-        if parent_label in bpy.data.objects:
+        print(
+            pre_line + "current parent_obj ", self.format_obj(func_data["parent_obj"])
+        )
+
+        if empty_label in bpy.data.objects:
             # print(
             #     pre_line +
-            #     "'{}' already in objects list.".format(parent_label)
+            #     "'{}' already in objects list.".format(empty_label)
             # )
             if self.config["update"]:
-                    parent_empty = bpy.data.objects[parent_label]
-                    # print(
-                    #     pre_line +
-                    #     "update: '{}'".format(parent_empty)
-                    # )
+                empty_bobj = bpy.data.objects[empty_label]
+                # print(
+                #     pre_line +
+                #     "update: '{}'".format(empty_bobj)
+                # )
             else:
-                renamed_to = helper.rename_old_data(
-                    bpy.data.objects, parent_label)
-                print(
-                    pre_line +
-                    "overwrite - renamed to "
-                    "'{}'".format(renamed_to)
-                )
+                renamed_to = helper.rename_old_data(bpy.data.objects, empty_label)
+                print(pre_line + "overwrite - renamed to " "'{}'".format(renamed_to))
 
         flag_new = False
-        if parent_empty is None:
-            print(pre_line + "create new parent_empty")
-            parent_empty = bpy.data.objects.new(
-                name=parent_label,
-                object_data=None
-            )
-            parent_empty.empty_display_size = 0.01
-            self.set_obj_parent_and_collection(
-                pre_line, func_data, parent_empty)
+        if empty_bobj is None:
+            print(pre_line + "create new empty_bobj '{}'".format(empty_label))
+            empty_bobj = bpy.data.objects.new(name=empty_label, object_data=None)
+            empty_bobj.empty_display_size = self.config["scale"] * 10
+            self.set_obj_parent_and_collection(pre_line, func_data, empty_bobj)
 
         if self.config["update"] or flag_new:
             # set position of empty
             if obj:
                 self.handle_placement(
-                    obj,
-                    parent_empty,
-                    enable_import_scale=False,
+                    pre_line, obj, empty_bobj,
                 )
+                # NOT HERE.
+                # if not func_data["is_link"]:
+                #     self.handle_placement(
+                #         pre_line,
+                #         obj,
+                #         empty_bobj,
+                #     )
+                #
+                # TODO: handle origin things corrrectly...
+                # origin_bobj
+                # getLinkedObject()
+                # >>> doc.Link006.getLinkedObject().Label
+                # 'Seagull_Double'
+                # >>> doc.Link003.getLinkedObject().Label
+                # 'Seagull_A1'
+                #
+                # if (
+                #     not func_data["is_link"]
+                # ):
+                #     self.handle_placement(
+                #         obj,
+                #         empty_bobj,
+                #     )
                 # print(
                 #     pre_line +
                 #     "'{}' set position"
-                #     "".format(parent_empty)
+                #     "".format(empty_bobj)
                 #     # "'{}' set position to '{}'"
-                #     # "".format(parent_empty, position)
+                #     # "".format(empty_bobj, position)
                 # )
 
         # update func_data links
-        func_data["obj_parent"] = obj
-        func_data["bobj_parent"] = parent_empty
-        return parent_empty
+        func_data["parent_obj"] = obj
+        func_data["parent_bobj"] = empty_bobj
+        return empty_bobj
 
     def create_collection_instance(
-        self,
-        func_data,
-        pre_line,
-        obj_label,
-        base_collection
+        self, func_data, pre_line, obj_label, base_collection
     ):
         """Create instance of given collection."""
-        result_bobj = bpy.data.objects.new(
-            name=obj_label,
-            object_data=None
-        )
+        result_bobj = bpy.data.objects.new(name=obj_label, object_data=None)
         result_bobj.instance_collection = base_collection
-        result_bobj.instance_type = 'COLLECTION'
-        result_bobj.empty_display_size = 0.01
+        result_bobj.instance_type = "COLLECTION"
+        result_bobj.empty_display_size = self.config["scale"] * 10
 
         # TODO: CHECK where to add this!
         if func_data["collection"]:
             func_data["collection"].objects.link(result_bobj)
             print(
-                pre_line +
-                "'{}' add to '{}' "
+                pre_line + "'{}' add to '{}' "
                 "".format(result_bobj, func_data["collection"])
             )
-        # result_bobj.parent = func_data["bobj_parent"]
-        # result_bobj.parent = obj_parent
+        # result_bobj.parent = func_data["parent_bobj"]
+        # result_bobj.parent = parent_obj
         if result_bobj.name in bpy.context.scene.collection.objects:
             bpy.context.scene.collection.objects.unlink(result_bobj)
 
         return result_bobj
 
-    def handle__object_with_sub_objects(
+    def create_link_instance(
+        self, func_data, pre_line, obj_label, link_target_bobj, link_target_obj
+    ):
+        """Create instance of given link_target_bobj."""
+        result_bobj = None
+        if link_target_obj.isDerivedFrom("Part::Feature"):
+            object_data = None
+            if link_target_bobj:
+                object_data = link_target_bobj.data
+            else:
+                object_data = bpy.data.meshes.new(name=obj_label + ".temp")
+            result_bobj = bpy.data.objects.new(name=obj_label, object_data=object_data)
+            result_bobj.empty_display_size = self.config["scale"] * 10
+        else:
+            self.config["report"](
+                {"WARNING"},
+                ("  TODO: create_link_instance " "part handling not implemented yet!!"),
+                pre_line,
+            )
+
+        if link_target_bobj:
+            result_bobj.scale = link_target_bobj.scale
+            # check if we need to create link children...
+            if link_target_obj.children:
+                self.config["report"](
+                    {"WARNING"},
+                    (
+                        "  Warning: create_link_instance "
+                        "children handling not implemented yet!!"
+                    ),
+                    pre_line,
+                )
+        return result_bobj
+
+    def handle__sub_object_import(
+        self,
+        *,
+        func_data,
+        obj,
+        pre_line,
+        parent_obj,
+        parent_bobj,
+        is_link_source=False,
+    ):
+        """Handle sub object."""
+        pre_line_orig = func_data["pre_line"]
+        print(pre_line_orig + "handle__sub_object_import")
+        pre_line = pre_line_orig + "  "
+        func_data["pre_line"] = pre_line
+        link_source = None
+        obj_label = self.get_obj_label(obj)
+        # print(pre_line + "obj_label:   " + obj_label)
+        if func_data["is_link"]:
+            obj_label = self.get_sub_obj_label(
+                pre_line,
+                func_data,
+                # parent_obj,
+                obj,
+            )
+            print(
+                pre_line
+                + "set special link obj_label: "
+                + b_helper.colors.fg.green
+                + "'{}'".format(obj_label)
+                + b_helper.colors.reset
+            )
+        link_source = func_data["link_source"]
+        if is_link_source:
+            link_source = obj
+        # debug output
+        print(pre_line + ("*" * 42))
+        print(pre_line + "obj:         " + self.format_obj(obj))
+        print(pre_line + "parent_obj:  " + self.format_obj(parent_obj))
+        print(pre_line + "parent_bobj:  {}".format(parent_bobj))
+        # # print(pre_line + "func_data[is_link]:  {}".format(func_data["is_link"]))
+        # is_link_color = b_helper.colors.fg.red
+        # if func_data["is_link"]:
+        #     is_link_color = b_helper.colors.fg.green
+        # print(
+        #     pre_line
+        #     + "func_data[is_link]: "
+        #     + is_link_color
+        #     + "{}".format(func_data["is_link"])
+        #     + b_helper.colors.reset
+        # )
+        # is_link_source_color = b_helper.colors.fg.red
+        # if is_link_source:
+        #     is_link_source_color = b_helper.colors.fg.green
+        # print(
+        #     pre_line
+        #     + "is_link_source: "
+        #     + is_link_source_color
+        #     + "{}".format(is_link_source)
+        #     + b_helper.colors.reset
+        # )
+        # print(
+        #     pre_line
+        #     + "func_data[link_source]:  "
+        #     + self.format_obj(func_data["link_source"])
+        # )
+        # print(
+        #     pre_line
+        #     + "link_source:  "
+        #     + self.format_obj(link_source)
+        # )
+        # print(pre_line + ("*"*42))
+        # prepare import
+        func_data_new = self.create_func_data()
+        func_data_new["obj"] = obj
+        func_data_new["obj_label"] = obj_label
+        func_data_new["collection"] = func_data["collection"]
+        func_data_new["collection_parent"] = func_data["collection_parent"]
+        func_data_new["parent_obj"] = parent_obj
+        func_data_new["parent_bobj"] = parent_bobj
+        func_data_new["is_link"] = func_data["is_link"]
+        func_data_new["link_source"] = link_source
+        print(pre_line + "import_obj ...")
+        self.import_obj(
+            func_data=func_data_new, pre_line=pre_line,
+        )
+        func_data["pre_line"] = pre_line_orig
+
+    def handle__sub_objects(
         self,
         func_data,
         sub_objects,
+        pre_line,
+        parent_obj,
+        parent_bobj,
         include_only_visible=True,
+        is_link_source=False,
     ):
-        """Handle sub objects."""
-        pre_line = func_data["pre_line"]
-        parent_label = self.get_obj_label(func_data["obj"])
-        print(
-            pre_line +
-            "handle__object_with_sub_objects '{}'".format(parent_label)
-        )
-        # pre_line += "→ "
-        self.parent_empty_add_or_update(func_data, parent_label)
-        if len(sub_objects) > 0:
-            sub_filter_visible = False
-            if not isinstance(include_only_visible, list):
-                # convert True or False to list
-                include_only_visible = [None] * len(sub_objects)
-                sub_filter_visible = True
-            # print(
-            #     pre_line +
-            #     "include_only_visible '{}'"
-            #     "".format(include_only_visible)
-            # )
+        """Handle sub object."""
+        # │─ ┌─ └─ ├─ ╞═ ╘═╒═
+        # ║═ ╔═ ╚═ ╠═ ╟─
+        # ┃━ ┏━ ┗━ ┣━ ┠─
+        pre_line_start = pre_line + "╔════ "
+        pre_line_sub_special = pre_line + "╠════ "
+        pre_line_sub = pre_line + "╠═ "
+        pre_line_follow = pre_line + "║   "
+        pre_line_end = pre_line + "╚════ "
 
-            sub_objects = fc_helper.filtered_objects(
-                sub_objects,
-                include_only_visible=sub_filter_visible
-            )
-            # │─ ┌─ └─ ├─ ╞═ ╘═╒═
-            # ║═ ╔═ ╚═ ╠═ ╟─
-            # ┃━ ┏━ ┗━ ┣━ ┠─
-            pre_line_start = pre_line + "╔════ "
-            pre_line_sub = pre_line + "╠═ "
-            pre_line_follow = pre_line + "║   "
-            pre_line_end = pre_line + "╚════ "
-            self.config["report"]({'INFO'}, (
+        pre_line_orig = func_data["pre_line"]
+        pre_line = pre_line_follow
+        func_data["pre_line"] = pre_line
+        print(
+            pre_line_start
+            + "handle__sub_objects"
+            # + " - sub_objects '{}'"
+            # + "".format(sub_objects)
+        )
+        sub_filter_visible = False
+        if not isinstance(include_only_visible, list):
+            # convert True or False to list
+            include_only_visible = [None] * len(sub_objects)
+            sub_filter_visible = True
+        # print(
+        #     pre_line +
+        #     "include_only_visible '{}'"
+        #     "".format(include_only_visible)
+        # )
+        # print(
+        #     pre_line +
+        #     "sub_objects '{}'"
+        #     "".format(sub_objects)
+        # )
+        # print(
+        #     pre_line +
+        #     "is_link_source '{}'"
+        #     "".format(is_link_source)
+        # )
+        print(pre_line + "parent_obj:  " + self.format_obj(parent_obj))
+        print(pre_line + "parent_bobj:  {}".format(parent_bobj))
+        sub_objects = fc_helper.filtered_objects(
+            sub_objects, include_only_visible=sub_filter_visible
+        )
+        self.config["report"](
+            {"INFO"},
+            (
                 b_helper.colors.bold
                 + b_helper.colors.fg.purple
                 + "Import {} Recusive:".format(len(sub_objects))
                 + b_helper.colors.reset
-            ), pre_line=pre_line_start)
+            ),
+            pre_line=pre_line_sub_special,
+        )
+        # is_link_source = False
+        # # if func_data["is_link"] and len(sub_objects) > 1:
+        # if len(sub_objects) > 1:
+        #     is_link_source = True
+        for index, obj in enumerate(sub_objects):
+            if self.check_obj_visibility_with_skiphidden(
+                obj, include_only_visible[index]
+            ):
+                self.print_obj(obj, pre_line_sub)
+                self.handle__sub_object_import(
+                    func_data=func_data,
+                    obj=obj,
+                    pre_line=pre_line_follow,
+                    parent_obj=parent_obj,
+                    parent_bobj=parent_bobj,
+                    is_link_source=is_link_source,
+                )
+            else:
+                self.print_obj(
+                    obj=obj,
+                    pre_line=pre_line_sub,
+                    post_line=(
+                        b_helper.colors.fg.darkgrey
+                        + "  (skipping - hidden)"
+                        + b_helper.colors.reset
+                    ),
+                )
+        func_data["pre_line"] = pre_line_orig
 
-            for index, obj in enumerate(sub_objects):
-                if self.check_obj_visibility_with_skiphidden(
-                    obj,
-                    include_only_visible[index]
-                ):
-                    self.print_obj(obj, pre_line_sub)
-                    self.import_obj(
-                        obj=obj,
-                        collection=func_data["collection"],
-                        collection_parent=func_data["collection_parent"],
-                        obj_parent=func_data["obj_parent"],
-                        bobj_parent=func_data["bobj_parent"],
-                        pre_line=pre_line_follow
-                    )
-                else:
-                    self.print_obj(
-                        obj=obj,
-                        pre_line=pre_line_sub,
-                        post_line=(
-                            b_helper.colors.fg.darkgrey
-                            + "  (skipping - hidden)"
-                            + b_helper.colors.reset
-                        )
-                    )
-            self.config["report"]({'INFO'}, (
+        if func_data["bobj"] is None:
+            func_data["bobj"] = parent_bobj
+
+        self.config["report"](
+            {"INFO"},
+            (
                 b_helper.colors.bold
                 + b_helper.colors.fg.purple
                 + "done."
                 + b_helper.colors.reset
-            ), pre_line=pre_line_end)
+            ),
+            pre_line=pre_line_end,
+        )
+
+    def handle__object_with_sub_objects(
+        self, func_data, sub_objects, include_only_visible=True, is_link_source=False,
+    ):
+        """Handle sub objects."""
+        pre_line = func_data["pre_line"]
+        parent_obj = func_data["obj"]
+        parent_label = self.get_obj_label(parent_obj)
+        if func_data["is_link"] and func_data["obj_label"]:
+            parent_label = func_data["obj_label"]
+        print(pre_line + "handle__object_with_sub_objects '{}'".format(parent_label))
+        # print(pre_line + "is_link_source '{}'".format(is_link_source))
+        # pre_line += "→ "
+
+        # print(pre_line + "force update parent_bobj to match parent_obj")
+        # p_label = self.get_obj_label(func_data["parent_obj"])
+        # if (
+        #     func_data["parent_obj"]
+        #     and p_label in bpy.data.objects
+        # ):
+        #     func_data["parent_bobj"] = bpy.data.objects[p_label]
+
+        self.print_obj(
+            func_data["parent_obj"], pre_line=pre_line + "# func_data[parent_obj]",
+        )
+        print(pre_line + "# func_data[parent_bobj]", func_data["parent_bobj"])
+
+        self.parent_empty_add_or_update(func_data, parent_label)
+        parent_bobj = func_data["parent_bobj"]
+        print(pre_line + "fresh created parent_bobj ", parent_bobj)
+
+        if len(sub_objects) > 0:
+            self.handle__sub_objects(
+                func_data,
+                sub_objects,
+                pre_line,
+                parent_obj,
+                parent_bobj,
+                include_only_visible=include_only_visible,
+                is_link_source=is_link_source,
+            )
         else:
-            self.config["report"]({'INFO'}, (
-                b_helper.colors.fg.darkgrey
-                + "→ no childs."
-                + b_helper.colors.reset
-            ), pre_line=pre_line)
+            self.config["report"](
+                {"INFO"},
+                (b_helper.colors.fg.darkgrey + "→ no childs." + b_helper.colors.reset),
+                pre_line=pre_line,
+            )
+
+    def handle__object_hosts(self, func_data):
+        """Handle object with hosts attribute (Arch Workbench)."""
+        pre_line = func_data["pre_line"]
+        obj = func_data["obj"]
+        obj_host = obj.Hosts[0]
+        obj_label = self.get_obj_label(obj)
+        obj_host_label = self.get_obj_label(obj_host)
+        print(pre_line + "handle__object_hosts '{}'".format(obj_label))
+        print(pre_line + "obj_host_label '{}'".format(obj_host_label))
+        bobj = func_data["bobj"]
+        bobj_host = bpy.data.objects[obj_host_label]
+        if bobj_host:
+            print(pre_line + "bobj_host '{}'".format(bobj_host))
+            print(pre_line + "bobj_host.parent '{}'".format(bobj_host.parent))
+            # Arch Wall Objects are no collection things - so we need to use the parent of it...
+            # in the hope that this works...
+            if bobj_host.parent:
+                bobj.parent = bobj_host.parent
+            else:
+                self.config["report"](
+                    {"WARNING"},
+                    (
+                        "Warning: host '{}' has no parrent. can not set parent for '{}' "
+                        "".format(obj_host_label, obj_label)
+                    ),
+                    pre_line,
+                )
 
     # ##########################################
     # Arrays and similar
-    def handle__ObjectWithElementList(self, func_data):
+    def handle__ObjectWithElementList(self, func_data, is_link_source=False):
         """Handle Part::Feature objects."""
-        # pre_line = func_data["pre_line"]
-        # print(
-        #     pre_line +
-        #     "handle__ObjectWithElementList "
-        # )
+        pre_line_orig = func_data["pre_line"]
+        print(pre_line_orig + "handle__ObjectWithElementList")
+        pre_line = pre_line_orig + "  "
+        func_data["pre_line"] = pre_line
         # fc_helper.print_objects(
         #     func_data["obj"].ElementList,
         #     pre_line=pre_line
@@ -594,13 +1061,22 @@ class ImportFcstd(object):
         self.handle__object_with_sub_objects(
             func_data,
             func_data["obj"].ElementList,
-            include_only_visible=include_only_visible
+            include_only_visible=include_only_visible,
+            is_link_source=is_link_source,
         )
+        func_data["pre_line"] = pre_line_orig
 
     # Part::FeaturePhython
     def handle__PartFeaturePython_Array(self, func_data):
         """Handle Part::Feature objects."""
-        # pre_line = func_data["pre_line"]
+        pre_line_orig = func_data["pre_line"]
+        print(
+            pre_line_orig + "handle__PartFeaturePython_Array",
+            self.format_obj(func_data["obj"]),
+        )
+        pre_line = pre_line_orig + "  "
+        func_data["pre_line"] = pre_line
+        pre_line = func_data["pre_line"]
         # print(
         #     pre_line + "ElementList:",
         #     func_data["obj"].ElementList
@@ -612,29 +1088,27 @@ class ImportFcstd(object):
         func_data["obj"].ExpandArray = True
         self.doc.recompute()
         # print(pre_line + "ExpandArray:", func_data["obj"].ExpandArray)
+        print(pre_line + "ElementList:", func_data["obj"].ElementList)
         # print(
-        #     pre_line + "ElementList:",
-        #     func_data["obj"].ElementList
+        #     pre_line
+        #     + "call handle__ObjectWithElementList with "
+        #     + b_helper.colors.fg.orange
+        #     + "is_link_source=True"
+        #     + b_helper.colors.reset
+        #     + ".."
         # )
-        self.handle__ObjectWithElementList(func_data)
+        self.handle__ObjectWithElementList(func_data, is_link_source=True)
+        func_data["pre_line"] = pre_line_orig
 
     # App::Part
     def handle__AppPart(self, func_data):
         """Handle App:Part type."""
         # pre_line = func_data["pre_line"]
-        self.handle__object_with_sub_objects(
-            func_data,
-            func_data["obj"].Group
-        )
+        self.handle__object_with_sub_objects(func_data, func_data["obj"].Group)
 
     # App::Link*
     def add_or_update_collection_instance(
-        self,
-        *,
-        func_data,
-        obj,
-        obj_label,
-        instance_target_label,
+        self, *, func_data, obj, obj_label, instance_target_label,
     ):
         """Add or update collection instance object."""
         pre_line_orig = func_data["pre_line"]
@@ -647,8 +1121,7 @@ class ImportFcstd(object):
         pre_line_follow = pre_line_orig + "│   "
         pre_line_end = pre_line_orig + "└────────── "
         print(
-            pre_line_start +
-            "add_or_update_collection_instance '{}'"
+            pre_line_start + "add_or_update_collection_instance '{}'"
             "".format(obj_label)
         )
         func_data["pre_line"] = pre_line_follow
@@ -658,9 +1131,7 @@ class ImportFcstd(object):
         print(pre_line + "obj_label '{}'".format(obj_label))
         print(pre_line + "instance_target_label '{}'".format(instance_target_label))
         print(
-            pre_line +
-            "func_data[collection] '{}'"
-            "".format(func_data["collection"])
+            pre_line + "func_data[collection] '{}'" "".format(func_data["collection"])
         )
 
         base_collection = None
@@ -672,10 +1143,7 @@ class ImportFcstd(object):
                 bobj = bpy.data.objects[obj_label]
             else:
                 bobj = self.create_collection_instance(
-                    func_data,
-                    pre_line_follow,
-                    obj_label,
-                    base_collection
+                    func_data, pre_line_follow, obj_label, base_collection
                 )
                 flag_new = True
             # print(
@@ -684,43 +1152,134 @@ class ImportFcstd(object):
             #     "".format(bobj, flag_new)
             # )
             if self.config["update"] or flag_new:
-                self.set_obj_parent_and_collection(
-                    pre_line_follow,
-                    func_data,
-                    bobj
-                )
-                self.handle_placement(
-                    # pre_line_follow,
-                    obj,
-                    bobj,
-                    enable_import_scale=False,
-                    enable_scale=True
-                )
+                self.set_obj_parent_and_collection(pre_line_follow, func_data, bobj)
+                self.handle_placement(pre_line_follow, obj, bobj, enable_scale=True)
                 # print(
                 #     pre_line + "    "
                 #     "bobj '{}' ".format(bobj.location)
                 # )
         else:
             self.config["report"](
-                {'WARNING'},
+                {"WARNING"},
                 (
                     "Warning: can't add or update instance. "
                     "'{}' collection not found."
                     "".format(instance_target_label)
                 ),
-                pre_line
+                pre_line,
             )
             # return False
         print(pre_line_end + "")
         func_data["pre_line"] = pre_line_orig
 
+    def add_or_update_link_instance(
+        self, *, func_data, obj, obj_label, link_target_obj, link_target_label,
+    ):
+        """Add or update link instance object."""
+        pre_line_orig = func_data["pre_line"]
+        pre_line = pre_line_orig
+        # │─ ┌─ └─ ├─ ╞═ ╘═╒═
+        # ║═ ╔═ ╚═ ╠═ ╟─
+        # ┃━ ┏━ ┗━ ┣━ ┠─
+        pre_line_start = pre_line_orig + "┌ "
+        # pre_line_sub = pre_line_orig + "├─ "
+        pre_line_follow = pre_line_orig + "│   "
+        pre_line_end = pre_line_orig + "└────────── "
+        print(pre_line_start + "add_or_update_link_instance '{}'" "".format(obj_label))
+        func_data["pre_line"] = pre_line_follow
+        # pre_line = pre_line_sub
+        pre_line = pre_line_follow
+
+        print(pre_line + "obj_label '{}'".format(obj_label))
+        print(pre_line + "link_target_label '{}'".format(link_target_label))
+
+        link_target_bobj = None
+        bobj = None
+        if link_target_label in bpy.data.objects:
+            link_target_bobj = bpy.data.objects[link_target_label]
+            print(pre_line + "# link_target_bobj ", link_target_bobj)
+        else:
+            self.config["report"](
+                {"WARNING"},
+                (
+                    "Warning: can't add or update linnk instance. "
+                    "'{}' link_target not found."
+                    "".format(link_target_label)
+                ),
+                pre_line,
+            )
+            # return False
+        flag_new = False
+        if obj_label in bpy.data.objects:
+            bobj = bpy.data.objects[obj_label]
+            print(pre_line + "# bobj already here: ", bobj)
+        else:
+            bobj = self.create_link_instance(
+                func_data, pre_line_follow, obj_label, link_target_bobj, link_target_obj
+            )
+            print(pre_line + "# created new bobj: ", bobj)
+            flag_new = True
+        # print(
+        #     pre_line +
+        #     "bobj '{}'; new:{}"
+        #     "".format(bobj, flag_new)
+        # )
+        if self.config["update"] or flag_new:
+            # if func_data["parent_bobj"] is None:
+            #     func_data["parent_bobj"] = link_target_bobj
+            # print(
+            #     pre_line +
+            #     "'{}' try to set parent to '{}' "
+            #     "".format(bobj, func_data["parent_bobj"])
+            # )
+            # self.set_obj_parent_and_collection(
+            #     pre_line_follow,
+            #     func_data,
+            #     bobj
+            # )
+            self.handle_placement(pre_line_follow, obj, bobj, enable_scale=True)
+            # print(
+            #     pre_line + "    "
+            #     "bobj '{}' ".format(bobj.location)
+            # )
+            print(pre_line + "# bobj.data: ", bobj.data)
+            if bobj.data:
+                if bobj.data.name != link_target_label:
+                    if link_target_label in bpy.data.meshes:
+                        print(
+                            pre_line
+                            + "update / relink '{}' to original link target '{}'"
+                            "".format(obj_label, link_target_label)
+                        )
+                        old_mesh = bobj.data
+                        bobj.data = bpy.data.meshes[link_target_label]
+                        # clean up temporary mesh
+                        if old_mesh.users == 0:
+                            bpy.data.meshes.remove(old_mesh)
+                    else:
+                        print(
+                            pre_line + "→ link_target_label not in bpy.data.meshes "
+                            "Something wired going on.... "
+                            "it seems to working..."
+                            "TODO: maybe CHECK"
+                        )
+                # else:
+                #     print(
+                #         pre_line +
+                #         "→ bobj.data.name '{}' == link_target_label '{}' "
+                #         "".format(bobj.data.name, link_target_label)
+                #     )
+            else:
+                print(pre_line + "→ bobj.data == None " "→ maybe this is a Empty.")
+
+            func_data["bobj"] = bobj
+            func_data["update_tree"] = True
+
+        print(pre_line_end + "")
+        func_data["pre_line"] = pre_line_orig
+
     def add_or_update_link_target(
-        self,
-        *,
-        func_data,
-        obj,
-        obj_linkedobj,
-        obj_linkedobj_label,
+        self, *, func_data, obj, obj_label, obj_linkedobj, obj_linkedobj_label,
     ):
         """Add or update link target object."""
         pre_line = func_data["pre_line"]
@@ -740,29 +1299,65 @@ class ImportFcstd(object):
         #         obj.getParentGeoFeatureGroup()
         #     )
         # )
-        if obj_linkedobj_label in bpy.data.collections:
-            print(pre_line + "TODO: implement update.")
+
+        # print(
+        #     pre_line +
+        #     "self.imported_obj_names ",
+        #     self.imported_obj_names
+        # )
+
+        if obj_linkedobj_label in bpy.data.objects or (
+            obj_linkedobj_label in self.imported_obj_names
+        ):
+            print(
+                pre_line + "→ already imported/updated '{}'."
+                "".format(obj_linkedobj_label)
+            )
         else:
             self.print_obj(
                 obj,
                 pre_line=pre_line + "# ",
-                post_line=" → import Link Target '{}'.".format(
-                    obj_linkedobj_label
-                )
+                post_line=" → import Link Target {}.".format(
+                    self.format_obj(obj_linkedobj)
+                ),
+                end="",
             )
+
+            # self.print_obj(
+            #     obj_linkedobj,
+            #     pre_line=pre_line + "# ",
+            #     post_line=""
+            # )
+
+            # self.print_obj(
+            #     func_data["parent_obj"],
+            #     pre_line=pre_line + "# func_data[parent_obj]",
+            # )
+            # print(
+            #     pre_line + "# func_data[parent_bobj]",
+            #     func_data["parent_bobj"]
+            # )
+
             # if obj_linkedobj_label in bpy.data.objects:
             #     self.config["report"]({'INFO'}, (
             #         "skipping import. '{}' already in objects list."
             #         "".format(obj_linkedobj_label)
             #     ), pre_line)
             # else:
+            # set collection to link_target
+            # this way the imports get definitly added to the scene.
+            # func_data["collection"] = self.link_targets
+            print(pre_line + "§§§§§§§§§§§§§§§§§§§§§§§§§§§§§§§§§§§§§§§§§§")
+            func_data_obj_linked = self.create_func_data()
+            func_data_obj_linked["obj"] = obj_linkedobj
+            func_data_obj_linked["collection"] = self.link_targets
+            func_data_obj_linked["collection_parent"] = None
+            func_data_obj_linked["parent_obj"] = obj
+            func_data_obj_linked["parent_bobj"] = None
             func_data_obj_linked = self.import_obj(
-                obj=obj_linkedobj,
-                collection=None,
-                collection_parent=None,
-                bobj_parent=None,
-                pre_line=pre_line + '    '
+                func_data=func_data_obj_linked, pre_line=pre_line + "    ",
             )
+            print(pre_line + "§§§§§§§§§§§§§§§§§§§§§§§§§§§§§§§§§§§§§§§§§§")
             bobj = func_data_obj_linked["bobj"]
             # print(
             #    pre_line +
@@ -772,28 +1367,28 @@ class ImportFcstd(object):
             # pprint.pprint(func_data_obj_linked)
 
             # fix parent linking
-            # obj_parent = obj_linked.getParentGeoFeatureGroup()
-            # parent_label = self.get_obj_label(obj_parent)
+            # parent_obj = obj_linked.getParentGeoFeatureGroup()
+            # parent_label = self.get_obj_label(parent_obj)
             # if parent_label:
-            #     bobj_parent = bpy.data.objects[parent_label]
-            #     if bobj_parent:
-            #         bobj.parent = bobj_parent
+            #     parent_bobj = bpy.data.objects[parent_label]
+            #     if parent_bobj:
+            #         bobj.parent = parent_bobj
             #         print(
             #             pre_line +
             #             "'{}' set parent to '{}' "
-            #             "".format(bobj, bobj_parent)
+            #             "".format(bobj, parent_bobj)
             #         )
             # this has no parent as we use only the raw obj.
-
-            bobj.parent = None
+            self.print_obj(func_data_obj_linked["obj"], pre_line + "$ used obj: ")
+            print(pre_line + "$ created bobj: ", bobj)
+            print(pre_line + "$ bobj.parent: ", bobj.parent)
+            print(pre_line + "$ func_data[parent_bobj]: ", func_data["parent_bobj"])
+            # bobj.parent = None
             self.reset_placement_position(bobj)
+
             # print(
-            #     pre_line + "$ created bobj: ",
-            #     bobj
-            # )
-            # print(
-            #     pre_line + "$ bobj_parent: ",
-            #     func_data_obj_linked["bobj_parent"]
+            #     pre_line + "$ parent_bobj: ",
+            #     func_data_obj_linked["parent_bobj"]
             # )
             # print(
             #     pre_line + "$ collection: ",
@@ -806,33 +1401,15 @@ class ImportFcstd(object):
 
             # created collection for new link target
             func_data_obj_linked["collection"] = self.link_targets
-            self.sub_collection_add_or_update(
-                func_data_obj_linked, obj_linkedobj_label)
+            self.sub_collection_add_or_update(func_data_obj_linked, obj_linkedobj_label)
             # self.parent_empty_add_or_update(
             #     func_data_obj_linked, obj_linkedobj_label)
             # add new object to collection.
             func_data_obj_linked["collection"].objects.link(bobj)
             print(
-                pre_line +
-                "'{}' add to '{}' "
+                pre_line + "'{}' add to '{}' "
                 "".format(bobj, func_data_obj_linked["collection"])
             )
-
-            # bobj.parent = func_data_obj_linked["bobj_parent"]
-            # if func_data_obj_linked["collection"]:
-            #     base_collection = func_data_obj_linked["collection"]
-            #     print(
-            #         pre_line + "$ base_collection: ",
-            #         base_collection
-            #     )
-            # if base_collection:
-            #     # hide this internal object.
-            #     # we use only the instances..
-            #     base_collection.hide_render = False
-            #     base_collection.hide_select = True
-            #     base_collection.hide_viewport = False
-            # func_data["collection"] = func_data["collection_parent"]
-            # func_data["collection_parent"] = None
 
     def handle__AppLink(self, func_data):
         """Handle App::Link objects."""
@@ -845,16 +1422,16 @@ class ImportFcstd(object):
         # pre_line_sub = pre_line_orig + "├─ "
         pre_line_follow = pre_line_orig + "│   "
         pre_line_end = pre_line_orig + "└────────── "
-        print(
-            pre_line_start +
-            "handle__AppLink"
-        )
+        print(pre_line_start + "handle__AppLink")
         func_data["pre_line"] = pre_line_follow
         # pre_line = pre_line_sub
         pre_line = pre_line_follow
 
         obj = func_data["obj"]
         obj_linkedobj = func_data["obj"].LinkedObject
+        if isinstance(obj_linkedobj, tuple):
+            obj_linkedobj = obj_linkedobj[0]
+        # print(pre_line + "obj_linkedobj :", obj_linkedobj)
         # self.config["report"]({'WARNING'}, (
         #     "'{}' ('{s}') of type '{}': "
         #     "".format(obj.Label, obj.Name, obj.TypeId)
@@ -863,6 +1440,8 @@ class ImportFcstd(object):
         #     "  Warning: App::Link handling is highly experimental!!"
         # ), pre_line)
         obj_label = self.get_obj_label(obj)
+        if func_data["is_link"] and func_data["obj_label"]:
+            obj_label = func_data["obj_label"]
         # obj_linkedobj_label = self.get_obj_linkedobj_label(obj)
         # obj_linked_label = self.get_obj_label(obj_linkedobj)
 
@@ -879,25 +1458,44 @@ class ImportFcstd(object):
         #     fc_helper.print_obj(obj_linkedobj.LinkedObject, pre_line=pre_line)
 
         if obj_linkedobj:
-            if len(obj.ElementList) > 0:
+            orig_is_link = func_data["is_link"]
+            func_data["is_link"] = True
+
+            if hasattr(obj, "ElementList") and len(obj.ElementList) > 0:
                 print(pre_line + "ElementList > 0")
                 self.handle__ObjectWithElementList(func_data)
             else:
-                print(pre_line + "ElementList == 0")
-                # self.sub_collection_add_or_update(func_data, obj_label)
-                # self.parent_empty_add_or_update(func_data, obj_label)
-                self.handle__AppLinkElement(func_data)
+                print(pre_line + "Single Element → fake list")
+                # if target is of Body type get real link target
+                # this excludes the link → link → link chain...
+                # try:
+                #     obj_linkedobj.getLinkedObject().isDerivedFrom("Part::Feature")
+                # except Exception as e:
+                #     print(pre_line + "obj_linkedobj error:", e)
+                # else:
+                #     print(pre_line + "use recusive inner target")
+                #     obj_linkedobj = obj_linkedobj.getLinkedObject()
+                if obj_linkedobj.getLinkedObject().isDerivedFrom("Part::Feature"):
+                    print(pre_line + "use recusive inner target")
+                    obj_linkedobj = obj_linkedobj.getLinkedObject()
+                self.handle__object_with_sub_objects(
+                    func_data, [obj_linkedobj], include_only_visible=[True]
+                )
+            # set back to original
+            func_data["is_link"] = orig_is_link
         else:
-            self.config["report"]({'WARNING'}, (
-                "Warning: '{}' LinkedObject is NONE → skipping."
-                "".format(obj_label)
-            ), pre_line)
+            self.config["report"](
+                {"WARNING"},
+                ("Warning: '{}' LinkedObject is NONE → skipping." "".format(obj_label)),
+                pre_line,
+            )
         print(pre_line_end + "")
         func_data["pre_line"] = pre_line_orig
 
     def handle__AppLinkElement(self, func_data, obj_linkedobj=None):
         """Handle App::LinkElement objects."""
         pre_line_orig = func_data["pre_line"]
+
         pre_line = pre_line_orig
         # │─ ┌─ └─ ├─ ╞═ ╘═╒═
         # ║═ ╔═ ╚═ ╠═ ╟─
@@ -906,10 +1504,7 @@ class ImportFcstd(object):
         # pre_line_sub = pre_line_orig + "├─ "
         pre_line_follow = pre_line_orig + "│   "
         pre_line_end = pre_line_orig + "└────────── "
-        print(
-            pre_line_start +
-            "handle__AppLinkElement"
-        )
+        print(pre_line_start + "handle__AppLinkElement")
         func_data["pre_line"] = pre_line_follow
         # pre_line = pre_line_sub
         pre_line = pre_line_follow
@@ -917,50 +1512,70 @@ class ImportFcstd(object):
         obj = func_data["obj"]
         if obj_linkedobj is None:
             obj_linkedobj = func_data["obj"].LinkedObject
-        if hasattr(obj_linkedobj, "LinkedObject"):
-            # if we have Arrays they  have a intermediet link object..
-            # we skip this..
-            obj_linkedobj = obj_linkedobj.LinkedObject
-        # obj_parent = obj.InList[0]
-        obj_parent = func_data["obj_parent"]
-        # self.config["report"]({'ERROR'}, (
-        #     "'{}' ('{}') of type '{}': "
-        #     "ERROR: handle__AppLinkElement EXPERIMENTAL!"
-        #     "".format(obj.Label, obj.Name, obj.TypeId)
-        # ), pre_line)
 
-        # obj_parent_label = self.get_obj_label(obj_parent)
-        obj_label = self.get_obj_combined_label(obj_parent, obj)
-        obj_linkedobj_label = self.get_obj_linkedobj_label(obj)
+        # if hasattr(obj_linkedobj, "LinkedObject"):
+        #     # if we have Arrays they  have a intermediet link object..
+        #     # we skip this..
+        #     obj_linkedobj = obj_linkedobj.LinkedObject
+
+        # parent_obj = obj.InList[0]
+        parent_obj = func_data["parent_obj"]
+        # parent_obj_label = self.get_obj_label(parent_obj)
+        # if (
+        #     parent_obj and
+        #     parent_obj_label in bpy.data.objects
+        # ):
+        #     func_data["parent_bobj"] = bpy.data.objects[parent_obj_label]
+        print(pre_line + "func_data[parent_bobj]:", func_data["parent_bobj"])
+
+        # obj_label = self.get_obj_combined_label(parent_obj, obj)
+        obj_label = self.get_obj_label(obj)
+        if func_data["is_link"] and func_data["obj_label"]:
+            obj_label = func_data["obj_label"]
+        # obj_linkedobj_label = self.get_obj_linkedobj_label(obj)
+        obj_linkedobj_label = self.get_obj_label(obj_linkedobj)
 
         # print(pre_line + "collection:", func_data["collection"])
-        # print(pre_line + "obj_parent_label:", obj_parent_label)
+        # print(pre_line + "parent_obj_label:", parent_obj_label)
         print(pre_line + "obj_label:", obj_label)
         print(pre_line + "obj_linkedobj_label:", obj_linkedobj_label)
-        fc_helper.print_obj(
-            obj_parent,
-            pre_line=pre_line + "obj_parent   : ")
-        fc_helper.print_obj(
-            obj,
-            pre_line=pre_line + "obj          : ")
-        fc_helper.print_obj(
-            obj_linkedobj,
-            pre_line=pre_line + "obj_linkedobj: ")
+        fc_helper.print_obj(parent_obj, pre_line=pre_line + "parent_obj   : ")
+        fc_helper.print_obj(obj, pre_line=pre_line + "obj          : ")
+        fc_helper.print_obj(obj_linkedobj, pre_line=pre_line + "obj_linkedobj: ")
         # fc_helper.print_obj(obj_linked.LinkedObject, pre_line=pre_line)
+
+        if not self.config["links_as_collectioninstance"]:
+            self.add_or_update_link_instance(
+                func_data=func_data,
+                obj=obj,
+                obj_label=obj_label,
+                link_target_obj=obj_linkedobj,
+                link_target_label=obj_linkedobj_label,
+            )
 
         self.add_or_update_link_target(
             func_data=func_data,
             obj=obj,
+            obj_label=obj_label,
             obj_linkedobj=obj_linkedobj,
             obj_linkedobj_label=obj_linkedobj_label,
         )
 
-        self.add_or_update_collection_instance(
-            func_data=func_data,
-            obj=obj,
-            obj_label=obj_label,
-            instance_target_label=obj_linkedobj_label,
-        )
+        if self.config["links_as_collectioninstance"]:
+            self.add_or_update_collection_instance(
+                func_data=func_data,
+                obj=obj,
+                obj_label=obj_label,
+                instance_target_label=obj_linkedobj_label,
+            )
+        else:
+            self.add_or_update_link_instance(
+                func_data=func_data,
+                obj=obj,
+                obj_label=obj_label,
+                link_target_obj=obj_linkedobj,
+                link_target_label=obj_linkedobj_label,
+            )
         print(pre_line_end + "")
         func_data["pre_line"] = pre_line_orig
 
@@ -973,17 +1588,16 @@ class ImportFcstd(object):
         if self.hascurves(edge):
             # TODO use tessellation value
             dv = edge.discretize(9)
-            for i in range(len(dv)-1):
+            for i in range(len(dv) - 1):
                 dv1 = [dv[i].x, dv[i].y, dv[i].z]
-                dv2 = [dv[i+1].x, dv[i+1].y, dv[i+1].z]
+                dv2 = [dv[i + 1].x, dv[i + 1].y, dv[i + 1].z]
                 if dv1 not in func_data["verts"]:
                     func_data["verts"].append(dv1)
                 if dv2 not in func_data["verts"]:
                     func_data["verts"].append(dv2)
-                func_data["edges"].append([
-                    func_data["verts"].index(dv1),
-                    func_data["verts"].index(dv2)
-                ])
+                func_data["edges"].append(
+                    [func_data["verts"].index(dv1), func_data["verts"].index(dv2)]
+                )
         else:
             e = []
             for vert in edge.Vertexes:
@@ -997,6 +1611,7 @@ class ImportFcstd(object):
     def convert_face_to_polygon(self, func_data, face, faceedges):
         """Convert face to polygons."""
         import Part
+
         if (
             (len(face.Wires) > 1)
             or (not isinstance(face.Surface, Part.Plane))
@@ -1057,37 +1672,45 @@ class ImportFcstd(object):
 
     def create_mesh_from_shape(self, func_data):
         """Create mesh from shape."""
+        # print(func_data["pre_line"] + "create_mesh_from_shape")
         # a placeholder to store edges that belong to a face
         faceedges = []
         shape = func_data["obj"].Shape
+        # func_data["freecad_mesh_hash"] = shape.hashCode()
+        # hashCode changes on every file opening :-(
         if self.config["placement"]:
             shape = func_data["obj"].Shape.copy()
-            shape.Placement = \
+            shape.Placement = (
                 func_data["obj"].Placement.inverse().multiply(shape.Placement)
+            )
         if shape.Faces:
             self.handle_shape_faces(func_data, shape, faceedges)
         # Treat remaining edges (that are not in faces)
         for edge in shape.Edges:
             if not (edge.hashCode() in faceedges):
                 self.handle_shape_edge(func_data, edge)
+        return shape
 
     def handle__PartFeature(self, func_data):
         """Handle Part::Feature objects."""
-        # pre_line = func_data["pre_line"]
-        # print(func_data["pre_line"] + "handle__PartFeature")
-        # pre_line += "  > "
+        pre_line_orig = func_data["pre_line"]
+        pre_line = func_data["pre_line"]
+        print(func_data["pre_line"] + "handle__PartFeature")
+        pre_line += "> "
+        func_data["pre_line"] = pre_line
+
         obj = func_data["obj"]
         obj_label = self.get_obj_label(obj)
-        import_it = False
+        if func_data["is_link"] and func_data["obj_label"]:
+            obj_label = func_data["obj_label"]
+
+        # import_it = False
+        update_placement = False
         # check if this Part::Feature object is already imported.
         if self.config["links_as_collectioninstance"]:
-            # self.config["report"]({'WARNING'},(
-            #     "links_as_collectioninstance → Experimental!"
-            # ), pre_line)
             if (
                 obj_label in self.link_targets.children
                 and obj_label in bpy.data.objects
-                # or get_obj_link_target_label(obj) in bpy.data.objects
             ):
                 # print(
                 #     pre_line + "found link target object '{}'"
@@ -1113,30 +1736,42 @@ class ImportFcstd(object):
                     # instance_target_label=bobj_link_target_label,
                     instance_target_label=obj_label,
                 )
-
-                # obj_linkedobj = None
-                # self.handle__AppLinkElement(func_data, obj_linkedobj)
-
             else:
-                # print(
-                #     pre_line + "    "
-                #     "obj_label '{}' not found in link_targets. "
-                #     "so we do a normal import.. "
-                #     "".format(obj_label)
-                # )
-                import_it = True
+                # import_it = True
+                pass
         else:
-            if obj_label in self.data.objects:
-                bobj_target = bpy.data.objects[obj_label]
-                bmesh = bobj_target.data
-                bobj = self.create_bobj_from_bmesh(func_data, bmesh)
+            # handle creation of linked copies
+            print(pre_line + "handle creation of linked copies..")
+            # print(pre_line + "imported_obj_names:", self.imported_obj_names)
+            if (
+                obj_label
+                in bpy.data.objects
+                # and obj_label in self.imported_obj_names
+            ):
+                print(pre_line + "→ update bobj")
+                bobj = bpy.data.objects[obj_label]
                 func_data["bobj"] = bobj
+                if not func_data["is_link"]:
+                    update_placement = True
                 func_data["update_tree"] = True
             else:
-                import_it = True
+                print(pre_line + "→ just import it")
+                # import_it = True
 
-        if import_it:
-            self.create_mesh_from_shape(func_data)
+        # if import_it:
+        self.create_mesh_from_shape(func_data)
+        if func_data["verts"] and (func_data["faces"] or func_data["edges"]):
+            self.add_or_update_blender_obj(func_data)
+            func_data["update_tree"] = True
+
+        if update_placement:
+            # print(pre_line + "update_placement..")
+            self.handle_placement(
+                pre_line, obj, func_data["bobj"],
+            )
+
+        # restore
+        func_data["pre_line"] = pre_line_orig
 
     # Mesh::Feature
     def handle__MeshFeature(self, func_data):
@@ -1151,14 +1786,99 @@ class ImportFcstd(object):
 
     # ##########################################
     # main object import
+    def create_func_data(self):
+        "Create a blank func_data structure."
+        func_data = {
+            "obj": None,
+            "bobj": None,
+            "obj_label": None,
+            "verts": [],
+            "edges": [],
+            "faces": [],
+            "freecad_mesh_hash": None,
+            # face to material relationship
+            "matindex": [],
+            # to store reusable materials
+            "matdatabase": {},
+            # name: "Unnamed",
+            "link_targets": [],
+            "collection": None,
+            "collection_parent": None,
+            "parent_obj": None,
+            "parent_bobj": None,
+            "pre_line": "",
+            "update_tree": False,
+            "is_link": False,
+            "link_source": None,
+        }
+        return func_data
+
+    def _import_obj__handle_type(self, obj, func_data, pre_line=""):
+        """Choose Import Type."""
+        if (
+            obj.isDerivedFrom("Part::FeaturePython")
+            and hasattr(obj, "ExpandArray")
+            and hasattr(obj, "ElementList")
+        ):
+            self.handle__PartFeaturePython_Array(func_data)
+        elif obj.isDerivedFrom("Part::FeaturePython") and hasattr(obj, "ArrayType"):
+            self.config["report"](
+                {"WARNING"},
+                (
+                    "Unable to load '{}' ('{}') of type '{}'. "
+                    "(Type Not implemented yet)."
+                    "".format(obj.Label, obj.Name, obj.TypeId)
+                ),
+                pre_line,
+            )
+        elif obj.isDerivedFrom("Part::FeaturePython") and hasattr(obj, "Hosts"):
+            self.handle__PartFeature(func_data)
+            self.config["report"](
+                {"WARNING"},
+                (
+                    "EXPERIMENTAL import of '{}' ('{}') of type '{}'. "
+                    "(Type Not implemented yet)."
+                    "".format(obj.Label, obj.Name, obj.TypeId)
+                ),
+                pre_line,
+            )
+            self.handle__object_hosts(func_data)
+        elif obj.isDerivedFrom("Part::Feature"):
+            self.handle__PartFeature(func_data)
+        elif obj.isDerivedFrom("Mesh::Feature"):
+            self.handle__MeshFeature(func_data)
+        # elif obj.isDerivedFrom("PartDesign::Body"):
+        #     self.create_mesh_from_Body(func_data)
+        # elif obj.isDerivedFrom("XXXXXX"):
+        #     self.handle__XXXXXX(func_data)
+        elif obj.isDerivedFrom("App::Part"):
+            self.handle__AppPart(func_data)
+        elif obj.isDerivedFrom("App::LinkElement"):
+            # self.handle__AppLinkElement(func_data)
+            self.handle__AppLink(func_data)
+        elif obj.isDerivedFrom("App::Link"):
+            self.handle__AppLink(func_data)
+        else:
+            self.config["report"](
+                {"WARNING"},
+                (
+                    "Unable to load '{}' ('{}') of type '{}'. "
+                    "(Type Not implemented yet)."
+                    "".format(obj.Label, obj.Name, obj.TypeId)
+                ),
+                pre_line,
+            )
+        return func_data
+
     def import_obj(
         self,
-        obj=None,
-        collection=None,
-        collection_parent=None,
-        obj_parent=None,
-        bobj_parent=None,
-        pre_line=""
+        func_data=None,
+        # obj=None,
+        # collection=None,
+        # collection_parent=None,
+        # parent_obj=None,
+        # parent_bobj=None,
+        pre_line="",
     ):
         """Import Object."""
         # import some FreeCAD modules needed below.
@@ -1167,60 +1887,12 @@ class ImportFcstd(object):
         # import PartDesign
         # print("import_obj: obj", obj)
         # dict for storing all data
-        func_data = {
-            "obj": obj,
-            "bobj": None,
-            "verts": [],
-            "edges": [],
-            "faces": [],
-            # face to material relationship
-            "matindex": [],
-            # to store reusable materials
-            "matdatabase": {},
-            # name: "Unnamed",
-            "link_targets": [],
-            "collection": collection,
-            "collection_parent": collection_parent,
-            "obj_parent": obj_parent,
-            "bobj_parent": bobj_parent,
-            "pre_line": pre_line,
-            "update_tree": False,
-        }
-        # func_data["matindex"]
+        if not func_data:
+            func_data = self.create_func_data()
+        func_data["pre_line"] = pre_line
+        obj = func_data["obj"]
         if obj:
-            if (
-                obj.isDerivedFrom("Part::FeaturePython")
-                and hasattr(obj, 'ExpandArray')
-                and hasattr(obj, 'ElementList')
-            ):
-                self.handle__PartFeaturePython_Array(func_data)
-            elif obj.isDerivedFrom("Part::Feature"):
-                self.handle__PartFeature(func_data)
-            elif obj.isDerivedFrom("Mesh::Feature"):
-                self.handle__MeshFeature(func_data)
-            # elif obj.isDerivedFrom("PartDesign::Body"):
-            #     self.create_mesh_from_Body(func_data)
-            # elif obj.isDerivedFrom("XXXXXX"):
-            #     self.handle__XXXXXX(func_data)
-            elif obj.isDerivedFrom("App::Part"):
-                self.handle__AppPart(func_data)
-            elif obj.isDerivedFrom("App::LinkElement"):
-                self.handle__AppLinkElement(func_data)
-            elif obj.isDerivedFrom("App::Link"):
-                self.handle__AppLink(func_data)
-            else:
-                self.config["report"]({'WARNING'}, (
-                    "Unable to load '{}' ('{}') of type '{}'. "
-                    "(Type Not implemented yet)."
-                    "".format(obj.Label, obj.Name, obj.TypeId)
-                ), pre_line)
-
-            if (
-                func_data["verts"]
-                and (func_data["faces"] or func_data["edges"])
-            ):
-                self.add_or_update_blender_obj(func_data)
-                func_data["update_tree"] = True
+            self._import_obj__handle_type(obj, func_data, pre_line)
 
             if func_data["update_tree"]:
                 self.update_tree_collections(func_data)
@@ -1230,22 +1902,42 @@ class ImportFcstd(object):
     def import_doc_content(self, doc):
         """Import document content = filterd objects."""
         pre_line = ""
-        obj_list = fc_helper.get_root_objects(
-            doc,
-            filter_list=self.typeid_filter_list
+        obj_list, obj_list_withHost = fc_helper.get_root_objects(
+            doc, filter_list=self.typeid_filter_list
         )
-        print("-"*21)
+        print("-" * 21)
 
-        self.config["report"]({'INFO'}, (
-            "found {} root objects in '{}'"
-            "".format(len(obj_list), self.doc_filename)
-        ), pre_line=pre_line)
-        fc_helper.print_objects(
-            obj_list,
-            show_lists=True,
-            show_list_details=True
+        self.config["report"](
+            {"INFO"},
+            (
+                "found {} root objects in '{}'"
+                "".format(len(obj_list), self.doc_filename)
+            ),
+            pre_line=pre_line,
         )
-        print("-"*21)
+        fc_helper.print_objects(obj_list, show_lists=True, show_list_details=True)
+        print("-" * 21)
+
+        self.config["report"](
+            {"INFO"},
+            (
+                "found {} objects with Hosts attribute set in '{}'"
+                "".format(len(obj_list_withHost), self.doc_filename)
+            ),
+            pre_line=pre_line,
+        )
+        fc_helper.print_objects(
+            obj_list_withHost, show_lists=True, show_list_details=True
+        )
+        print("-" * 21)
+        self.config["report"](
+            {"INFO"},
+            ("the Hosts ARCH way is not implemented yet. so we just import them."),
+            pre_line=pre_line,
+        )
+        obj_list.extend(obj_list_withHost)
+        fc_helper.print_objects(obj_list, show_lists=True)
+        print("-" * 21)
         # │─ ┌─ └─ ├─ ╞═ ╘═╒═
         # ║═ ╔═ ╚═ ╠═ ╟─
         # ┃━ ┏━ ┗━ ┣━ ┠─
@@ -1253,20 +1945,23 @@ class ImportFcstd(object):
         pre_line_sub = pre_line + "┣━ "
         pre_line_follow = pre_line + "┃    "
         pre_line_end = pre_line + "┗━━━━ "
-        self.config["report"](
-            {'INFO'},
-            "Import",
-            pre_line=pre_line_start
-        )
+        self.config["report"]({"INFO"}, "Import", pre_line=pre_line_start)
         for obj in obj_list:
             if self.check_obj_visibility_with_skiphidden(obj):
                 self.print_obj(obj, pre_line=pre_line_sub)
+                func_data_new = self.create_func_data()
+                func_data_new["obj"] = obj
+                func_data_new["collection"] = self.fcstd_collection
+                func_data_new["parent_bobj"] = self.fcstd_empty
                 self.import_obj(
-                    obj=obj,
-                    collection=self.fcstd_collection,
-                    bobj_parent=self.fcstd_empty,
-                    pre_line=pre_line_follow,
+                    func_data=func_data_new, pre_line=pre_line_follow,
                 )
+                if obj in obj_list_withHost:
+                    self.config["report"](
+                        {"INFO"},
+                        ("TODO: handle Hosts [{}] of obj '{}'").format(obj.Hosts, obj),
+                        pre_line=pre_line_follow,
+                    )
             else:
                 self.print_obj(
                     obj=obj,
@@ -1275,13 +1970,9 @@ class ImportFcstd(object):
                         b_helper.colors.fg.darkgrey
                         + "  (skipping - hidden)"
                         + b_helper.colors.reset
-                    )
+                    ),
                 )
-        self.config["report"](
-            {'INFO'},
-            "finished.",
-            pre_line=pre_line_end
-        )
+        self.config["report"]({"INFO"}, "finished.", pre_line=pre_line_end)
 
     def prepare_collection(self):
         """Prepare main import collection."""
@@ -1314,31 +2005,68 @@ class ImportFcstd(object):
         """Prepare import file root empty."""
         func_data = {
             "obj": None,
-            "obj_parent": None,
-            "bobj_parent": None,
+            "parent_obj": None,
+            "parent_bobj": None,
             "collection": self.fcstd_collection,
             "pre_line": "",
         }
-        self.fcstd_empty = self.parent_empty_add_or_update(
-            func_data,
-            self.doc_filename
-        )
+        self.fcstd_empty = self.parent_empty_add_or_update(func_data, self.doc_filename)
+
+    def append_path(self, path, sub=""):
+        if path and sub:
+            path = os.path.join(path, sub)
+            print("full path:", path)
+        if path and os.path.exists(path):
+            if os.path.isfile(path):
+                path = os.path.dirname(path)
+            print("Configured path:", path)
+            if path not in sys.path:
+                sys.path.append(path)
+        else:
+            self.config["report"](
+                {"WARNING"}, ("Path does not exist. Please check! " "'{}'".format(path))
+            )
 
     def prepare_freecad_import(self):
         """Prepare FreeCAD import."""
         # append the FreeCAD path specified in addon preferences
-        path = self.path_to_freecad
-        if path and os.path.exists(path):
-            if os.path.isfile(path):
-                path = os.path.dirname(path)
-            print("Configured path to FreeCAD:", path)
-            if path not in sys.path:
-                sys.path.append(path)
-        else:
-            self.config["report"]({'WARNING'}, (
-                "Path to FreeCAD does not exist. Please check! "
-                "'{}'".format(path)
-            ))
+        self.append_path(self.path_to_freecad)
+        self.append_path(self.path_to_system_packages)
+
+    def handle_additonal_paths(self):
+        """Prepare more paths for import."""
+        # append the FreeCAD path specified in addon preferences
+        import FreeCAD
+
+        path_base = FreeCAD.getResourceDir()  # noqa
+        # https://wiki.freecadweb.org/PySide
+        # /usr/share/freecad-daily/Ext/PySide
+        self.append_path(path_base, "Ext")
+        self.append_path(path_base, "Mod")
+
+    def import_extras(self):
+        """Import additional things."""
+        self.handle_additonal_paths()
+        try:
+            import Part  # noqa
+
+            # import PartDesign  # noqa
+            import Draft  # noqa
+            import Arch  # noqa
+        except ModuleNotFoundError as e:
+            self.config["report"](
+                {"ERROR"},
+                "Unable to import one of the additional modules. \n"
+                "\n"
+                "Make sure it can be found by Python, \n"
+                "you might need to set its path in this Addon preferences.. "
+                "(User preferences->Addons->expand this addon).\n"
+                "\n" + str(e),
+            )
+            return {"CANCELLED"}
+        except Exception as e:
+            self.config["report"]({"ERROR"}, "Import Failed.\n" "\n" + str(e))
+            return {"CANCELLED"}
 
     def import_fcstd(self, filename=None):
         """Read a FreeCAD .FCStd file and creates Blender objects."""
@@ -1348,10 +2076,9 @@ class ImportFcstd(object):
         try:
             self.prepare_freecad_import()
             import FreeCAD
-        # except ModuleNotFoundError as e:
-        except Exception as e:
+        except ModuleNotFoundError as e:
             self.config["report"](
-                {'ERROR'},
+                {"ERROR"},
                 "Unable to import the FreeCAD Python module. \n"
                 "\n"
                 "Make sure it is installed on your system \n"
@@ -1359,14 +2086,17 @@ class ImportFcstd(object):
                 "It must also be found by Python, \n"
                 "you might need to set its path in this Addon preferences "
                 "(User preferences->Addons->expand this addon).\n"
-                "\n"
-                + str(e)
+                "\n" + str(e),
             )
-            return {'CANCELLED'}
+            return {"CANCELLED"}
+        except Exception as e:
+            self.config["report"]({"ERROR"}, "Import Failed.\n" "\n" + str(e))
+            return {"CANCELLED"}
+
+        self.import_extras()
 
         self.guidata = guidata.load_guidata(
-            self.config["filename"],
-            self.config["report"],
+            self.config["filename"], self.config["report"],
         )
 
         # Context Managers not implemented..
@@ -1377,9 +2107,7 @@ class ImportFcstd(object):
             # doc = FreeCAD.open(
             #     "/home/stefan/mydata/freecad/tests/linking_test/Linking.FCStd")
             self.config["report"](
-                {'INFO'},
-                "open FreeCAD file. '{}'"
-                "".format(self.config["filename"])
+                {"INFO"}, "open FreeCAD file. '{}'" "".format(self.config["filename"])
             )
             try:
                 doc = FreeCAD.open(self.config["filename"])
@@ -1389,12 +2117,11 @@ class ImportFcstd(object):
             if doc:
                 self.doc_filename = doc.Name + ".FCStd"
                 self.config["report"](
-                    {'INFO'},
-                    "File '{}' successfully opened."
-                    "".format(self.doc_filename)
+                    {"INFO"},
+                    "File '{}' successfully opened." "".format(self.doc_filename),
                 )
                 self.doc = doc
-                self.config["report"]({'INFO'}, "recompute..")
+                self.config["report"]({"INFO"}, "recompute..")
                 self.doc.recompute()
                 # self.config["report"]({'INFO'}, "importLinks..")
                 # self.doc.importLinks()
@@ -1406,18 +2133,18 @@ class ImportFcstd(object):
                 self.import_doc_content(doc)
             else:
                 self.config["report"](
-                    {'ERROR'},
+                    {"ERROR"},
                     "Unable to open the given FreeCAD file '{}'"
-                    "".format(self.config["filename"])
+                    "".format(self.config["filename"]),
                 )
-                return {'CANCELLED'}
+                return {"CANCELLED"}
         except Exception as e:
-            self.config["report"]({'ERROR'}, str(e))
+            self.config["report"]({"ERROR"}, str(e))
             raise e
         finally:
             FreeCAD.closeDocument(docname)
         print("Import finished.")
-        return {'FINISHED'}
+        return {"FINISHED"}
 
 
 def main_test():
@@ -1425,5 +2152,5 @@ def main_test():
     pass
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main_test()

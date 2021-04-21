@@ -29,7 +29,7 @@ try:
         import FreeCAD
     except ModuleNotFoundError:
         append_freecad_path()
-    import FreeCAD
+        import FreeCAD
     print("FreeCAD version:", FreeCAD.Version())
 except ModuleNotFoundError as e:
     print("FreeCAD import failed.", e)
@@ -163,7 +163,10 @@ def print_obj_with_label(doc, label):
 
 doc = FreeCAD.open(
     "/home/stefan/mydata/github/blender/"
-    "io_import_fcstd/dev/freecad_linking_example/assembly.FCStd"
+    "io_import_fcstd/"
+    # "dev/freecad_linking_example/assembly.FCStd"
+    # "dev/freecad_test_MyLittleWorld/MyLittleWorld.FCStd"
+    "dev/freecad_test_body_objects/BodyTest.FCStd"
 )
 docname = doc.Name
 
