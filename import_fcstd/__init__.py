@@ -365,12 +365,21 @@ class ImportFcstd(object):
         """Update object tree."""
         pre_line = func_data["pre_line"]
         bobj = func_data["bobj"]
+        # print(pre_line + "update_tree_parents")
+        # print(pre_line + "  bobj.parent '{}'".format(bobj.parent))
+        # print(
+        #     pre_line + "  func_data[parent_bobj] '{}'".format(func_data["parent_bobj"])
+        # )
         if bobj.parent is None and func_data["parent_bobj"] is not None:
-            bobj.parent = func_data["parent_bobj"]
             print(
-                pre_line + "update_tree_parents: '{}' set parent to '{}' "
+                pre_line + "update_tree_parents" + "  obj '{}' set parent to '{}' "
                 "".format(bobj, func_data["parent_bobj"])
             )
+            # print(
+            #     pre_line + "  obj '{}' set parent to '{}' "
+            #     "".format(bobj, func_data["parent_bobj"])
+            # )
+            bobj.parent = func_data["parent_bobj"]
             # TODO: check 'update'
 
     def create_bmesh_from_func_data(
@@ -1017,34 +1026,6 @@ class ImportFcstd(object):
                 pre_line=pre_line,
             )
 
-    def handle__object_hosts(self, func_data):
-        """Handle object with hosts attribute (Arch Workbench)."""
-        pre_line = func_data["pre_line"]
-        obj = func_data["obj"]
-        obj_host = obj.Hosts[0]
-        obj_label = self.get_obj_label(obj)
-        obj_host_label = self.get_obj_label(obj_host)
-        print(pre_line + "handle__object_hosts '{}'".format(obj_label))
-        print(pre_line + "obj_host_label '{}'".format(obj_host_label))
-        bobj = func_data["bobj"]
-        bobj_host = bpy.data.objects[obj_host_label]
-        if bobj_host:
-            print(pre_line + "bobj_host '{}'".format(bobj_host))
-            print(pre_line + "bobj_host.parent '{}'".format(bobj_host.parent))
-            # Arch Wall Objects are no collection things - so we need to use the parent of it...
-            # in the hope that this works...
-            if bobj_host.parent:
-                bobj.parent = bobj_host.parent
-            else:
-                self.config["report"](
-                    {"WARNING"},
-                    (
-                        "Warning: host '{}' has no parrent. can not set parent for '{}' "
-                        "".format(obj_host_label, obj_label)
-                    ),
-                    pre_line,
-                )
-
     # ##########################################
     # Arrays and similar
     def handle__ObjectWithElementList(self, func_data, is_link_source=False):
@@ -1099,6 +1080,64 @@ class ImportFcstd(object):
         # )
         self.handle__ObjectWithElementList(func_data, is_link_source=True)
         func_data["pre_line"] = pre_line_orig
+
+    def handle__PartFeaturePython_ArchWithHostChilds(self, func_data):
+        """Handle Part::Feature Arch objects with HostsChilds."""
+        pre_line_orig = func_data["pre_line"]
+        print(
+            pre_line_orig + "handle__PartFeaturePython_ArchWithHostChilds",
+            self.format_obj(func_data["obj"]),
+        )
+        pre_line = pre_line_orig + "  "
+        func_data["pre_line"] = pre_line
+        pre_line = func_data["pre_line"]
+        obj = func_data["obj"]
+        # import the part itself
+        self.handle__PartFeature(func_data)
+        # handle childs
+        original_parent = func_data["parent_bobj"]
+        obj_childs = fc_helper.object_get_HostChilds(obj)
+        # print(pre_line + "obj_childs:", obj_childs)
+        # print(pre_line + "len(obj_childs):", len(obj_childs))
+        self.handle__object_with_sub_objects(func_data, obj_childs)
+        # restor
+        func_data["parent_bobj"] = original_parent
+        func_data["pre_line"] = pre_line_orig
+
+    def handle__PartFeaturePython(self, func_data, pre_line=""):
+        """Handle Part::FeaturePython objects."""
+        obj = func_data["obj"]
+        if hasattr(obj, "ExpandArray") and hasattr(obj, "ElementList"):
+            self.handle__PartFeaturePython_Array(func_data)
+        elif hasattr(obj, "ArrayType"):
+            self.config["report"](
+                {"WARNING"},
+                (
+                    "Unable to load '{}' ('{}') of type '{}'. "
+                    "(Type Not implemented yet)."
+                    "".format(obj.Label, obj.Name, obj.TypeId)
+                ),
+                pre_line,
+            )
+        elif len(fc_helper.object_get_HostChilds(obj)) > 0:
+            # Arch Workbench - ArchComponent
+            self.handle__PartFeaturePython_ArchWithHostChilds(func_data)
+        elif hasattr(obj, "Hosts"):
+            # Arch Workbench - Childs
+            self.handle__PartFeature(func_data)
+
+            # self.handle__object_hosts(func_data)
+            # not needed anymore - as the main import now handles the parent-child relationship
+        else:
+            self.config["report"](
+                {"WARNING"},
+                (
+                    "Unable to load '{}' ('{}') of type '{}'. "
+                    "Sub-Type of 'Part::FeaturePython' not implemented yet."
+                    "".format(obj.Label, obj.Name, obj.TypeId)
+                ),
+                pre_line,
+            )
 
     # App::Part
     def handle__AppPart(self, func_data):
@@ -1580,6 +1619,36 @@ class ImportFcstd(object):
         func_data["pre_line"] = pre_line_orig
 
     # ##########################################
+    # 'Arch' object types
+    def handle__object_hosts(self, func_data):
+        """Handle object with hosts attribute (Arch Workbench)."""
+        pre_line = func_data["pre_line"]
+        obj = func_data["obj"]
+        obj_host = obj.Hosts[0]
+        obj_label = self.get_obj_label(obj)
+        obj_host_label = self.get_obj_label(obj_host)
+        print(pre_line + "handle__object_hosts '{}'".format(obj_label))
+        print(pre_line + "obj_host_label '{}'".format(obj_host_label))
+        bobj = func_data["bobj"]
+        bobj_host = bpy.data.objects[obj_host_label]
+        if bobj_host:
+            print(pre_line + "bobj_host '{}'".format(bobj_host))
+            print(pre_line + "bobj_host.parent '{}'".format(bobj_host.parent))
+            # Arch Wall Objects are no collection things - so we need to use the parent of it...
+            # in the hope that this works...
+            if bobj_host.parent:
+                bobj.parent = bobj_host.parent
+            else:
+                self.config["report"](
+                    {"WARNING"},
+                    (
+                        "Warning: host '{}' has no parrent. can not set parent for '{}' "
+                        "".format(obj_host_label, obj_label)
+                    ),
+                    pre_line,
+                )
+
+    # ##########################################
     # 'real' object types
 
     # Part::Feature
@@ -1813,36 +1882,11 @@ class ImportFcstd(object):
         }
         return func_data
 
-    def _import_obj__handle_type(self, obj, func_data, pre_line=""):
+    def _import_obj__handle_type(self, func_data, pre_line=""):
         """Choose Import Type."""
-        if (
-            obj.isDerivedFrom("Part::FeaturePython")
-            and hasattr(obj, "ExpandArray")
-            and hasattr(obj, "ElementList")
-        ):
-            self.handle__PartFeaturePython_Array(func_data)
-        elif obj.isDerivedFrom("Part::FeaturePython") and hasattr(obj, "ArrayType"):
-            self.config["report"](
-                {"WARNING"},
-                (
-                    "Unable to load '{}' ('{}') of type '{}'. "
-                    "(Type Not implemented yet)."
-                    "".format(obj.Label, obj.Name, obj.TypeId)
-                ),
-                pre_line,
-            )
-        elif obj.isDerivedFrom("Part::FeaturePython") and hasattr(obj, "Hosts"):
-            self.handle__PartFeature(func_data)
-            self.config["report"](
-                {"WARNING"},
-                (
-                    "EXPERIMENTAL import of '{}' ('{}') of type '{}'. "
-                    "(Type Not implemented yet)."
-                    "".format(obj.Label, obj.Name, obj.TypeId)
-                ),
-                pre_line,
-            )
-            self.handle__object_hosts(func_data)
+        obj = func_data["obj"]
+        if obj.isDerivedFrom("Part::FeaturePython"):
+            self.handle__PartFeaturePython(func_data, pre_line)
         elif obj.isDerivedFrom("Part::Feature"):
             self.handle__PartFeature(func_data)
         elif obj.isDerivedFrom("Mesh::Feature"):
@@ -1892,7 +1936,7 @@ class ImportFcstd(object):
         func_data["pre_line"] = pre_line
         obj = func_data["obj"]
         if obj:
-            self._import_obj__handle_type(obj, func_data, pre_line)
+            self._import_obj__handle_type(func_data, pre_line)
 
             if func_data["update_tree"]:
                 self.update_tree_collections(func_data)
@@ -1921,7 +1965,7 @@ class ImportFcstd(object):
         self.config["report"](
             {"INFO"},
             (
-                "found {} objects with Hosts attribute set in '{}'"
+                "found {} objects with Hosts attribute set in '{}' - will be handled as childs.."
                 "".format(len(obj_list_withHost), self.doc_filename)
             ),
             pre_line=pre_line,
@@ -1930,14 +1974,15 @@ class ImportFcstd(object):
             obj_list_withHost, show_lists=True, show_list_details=True
         )
         print("-" * 21)
-        self.config["report"](
-            {"INFO"},
-            ("the Hosts ARCH way is not implemented yet. so we just import them."),
-            pre_line=pre_line,
-        )
-        obj_list.extend(obj_list_withHost)
-        fc_helper.print_objects(obj_list, show_lists=True)
-        print("-" * 21)
+        # self.config["report"](
+        #     {"INFO"},
+        #     ("the Hosts ARCH way is not implemented yet. so we just import them."),
+        #     pre_line=pre_line,
+        # )
+        # obj_list.extend(obj_list_withHost)
+        # fc_helper.print_objects(obj_list, show_lists=True)
+        # print("-" * 21)
+
         # │─ ┌─ └─ ├─ ╞═ ╘═╒═
         # ║═ ╔═ ╚═ ╠═ ╟─
         # ┃━ ┏━ ┗━ ┣━ ┠─

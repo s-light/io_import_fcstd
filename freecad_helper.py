@@ -182,6 +182,8 @@ def get_root_objects(doc, filter_list=[]):
     result_objects_withHost = []
     for obj in doc.Objects:
         if obj.TypeId not in typeid_filter_list:
+            # if len(obj.Parents) == 0 and len(object_get_HostChilds(obj) == 0):
+            #     result_objects.append(obj)
             if len(obj.Parents) == 0:
                 if hasattr(obj, "Hosts"):
                     if len(obj.Hosts) == 0:
@@ -191,6 +193,26 @@ def get_root_objects(doc, filter_list=[]):
                 else:
                     result_objects.append(obj)
     return result_objects, result_objects_withHost
+
+
+def object_get_HostChilds(obj):
+    """Return List of Objects that have set Host(s) to this object."""
+    # source:
+    # FreeCAD/src/Mod/Arch/ArchComponent.py
+    # https://github.com/FreeCAD/FreeCAD/blob/master/src/Mod/Arch/ArchComponent.py#L1109
+    # def getHosts(self,obj)
+    hosts = []
+
+    for link in obj.InListRecursive:
+        if hasattr(link, "Host"):
+            if link.Host:
+                if link.Host == obj:
+                    hosts.append(link)
+        elif hasattr(link, "Hosts"):
+            if link.Hosts:
+                if obj in link.Hosts:
+                    hosts.append(link)
+    return hosts
 
 
 # ******************************************
