@@ -406,6 +406,8 @@ class ImportFcstd(object):
                 bobj=bobj,
                 obj_label=obj_label,
                 sharemats=self.config["sharemats"],
+                report=self.config["report"],
+                report_preline=func_data["pre_line"] + "| ",
             )
             material_manager.create_new()
         else:
