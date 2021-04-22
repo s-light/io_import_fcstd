@@ -1132,12 +1132,13 @@ class ImportFcstd(object):
             self.config["report"](
                 {"WARNING"},
                 (
-                    "Unable to load '{}' ('{}') of type '{}'. "
-                    "Sub-Type of 'Part::FeaturePython' not implemented yet."
+                    "try to load '{}' ('{}') of type '{}' as normal Part::Feature. "
+                    "no special implementation for Sub-Type of 'Part::FeaturePython' found."
                     "".format(obj.Label, obj.Name, obj.TypeId)
                 ),
                 pre_line,
             )
+            self.handle__PartFeature(func_data)
 
     # App::Part
     def handle__AppPart(self, func_data):
