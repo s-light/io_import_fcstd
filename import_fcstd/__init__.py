@@ -118,6 +118,16 @@ class ImportFcstd(object):
         # print(message, end=end)
         self.config["report"]({"INFO"}, message, pre_line)
 
+    def print_debug_report(self):
+        """print out some minimal debug things.."""
+        print("print_debug_report")
+        import FreeCAD
+        print("FreeCAD version:", FreeCAD.Version())
+        objects = FreeCAD.ActiveDocument.Objects
+        print("doc.Objects", len(objects))
+        for o in objects:
+            print(o, o.Name)
+
     def handle_label_prefix(self, label):
         """Handle all label prefix processing."""
         if label:
@@ -2065,7 +2075,7 @@ class ImportFcstd(object):
         if path and os.path.exists(path):
             if os.path.isfile(path):
                 path = os.path.dirname(path)
-            print("Configured path:", path)
+            print("configured path:", path)
             if path not in sys.path:
                 sys.path.append(path)
         else:
@@ -2167,6 +2177,7 @@ class ImportFcstd(object):
                     "File '{}' successfully opened." "".format(self.doc_filename),
                 )
                 self.doc = doc
+                # self.print_debug_report()
                 self.config["report"]({"INFO"}, "recompute..")
                 self.doc.recompute()
                 # self.config["report"]({'INFO'}, "importLinks..")
