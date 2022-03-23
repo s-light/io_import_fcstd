@@ -65,17 +65,65 @@ If no error message appears, everything is fine:
 `import FreeCAD`
 
 
-# warning
+# working with...
+currently i only test under linux 64bit.
+please let me know in the issues if it is / is not working for you on other setups.
 
-this is currently only tested with 0.19 / daily-builds on linux 64bit.
-if you want to try, please use a FreeCAD build
-[v0.19](https://github.com/FreeCAD/FreeCAD/releases)
-or newer...
 
+Blender
+```
+version: 3.1.0, branch: master, commit date: 2022-03-08 18:16, hash: c77597cd0e15, type: release
+build date: 2022-03-09, 00:34:48
+platform: 'Linux-5.11.0-50-generic-x86_64-with-glibc2.33'
+```
+and
+FreeCAD 0.19
+```python
+OS: Ubuntu 21.04 (KDE/plasma)
+Word size of OS: 64-bit
+Word size of FreeCAD: 64-bit
+Version: 0.19.
+Build type: Release
+Branch: unknown
+Hash: 0d9536ed3e8c7f40197b5606e1b7873625e1d6fe
+Python version: 3.9.5
+Qt version: 5.15.2
+Coin version: 4.0.0
+OCC version: 7.5.2
+Locale: English/United States (en_US)
+
+
+# build in python console:
+Python 3.9.5 (default, Nov 18 2021, 16:00:48)
+[GCC 10.3.0] on linux
+Type 'help', 'copyright', 'credits' or 'license' for more information.
+>>> App.Version()[4]
+'2021/07/21 08:10:00'
+```
+and
+FreeCAD-daily 0.20
+```python
+OS: Ubuntu 21.04 (KDE/plasma)
+Word size of FreeCAD: 64-bit
+Version: 0.20.
+Build type: Release
+Branch: unknown
+Hash: 4acef3f14fe694f28f7935108d36341b8df83a39
+Python version: 3.9.5
+Qt version: 5.15.2
+Coin version: 4.0.0
+OCC version: 7.5.2
+Locale: English/United States (en_US)
+
+# build in python console:
+Python 3.9.5 (default, Nov 18 2021, 16:00:48)
+[GCC 10.3.0] on linux
+>>> App.Version()[4]
+'2022/01/26 04:18:00'
+```
 
 # TODO
 see the [issues for open points](https://github.com/s-light/io_import_fcstd/issues).
 
-- support PartDesign
 - support clones
 - support texts, dimensions, etc (non-part/mesh objects)
