@@ -2083,15 +2083,39 @@ class ImportFcstd(object):
                 {"WARNING"}, ("Path does not exist. Please check! " "'{}'".format(path))
             )
 
+    def prepare_freecad_path(self):
+        """Find FreeCAD libraries."""
+        # https://github.com/s-light/io_import_fcstd/issues/11
+
+        # check user specified location specified in addon preferences
+
+        # try snap
+        # "/snap/freecad/current/usr/lib/"
+
+        # try appimage 
+        self.appimage_mounted = False
+        # my.AppImage --appimage-mount
+        # use mountingpoitn.
+
+        # try flatpack
+
+        # set path to new location
+        # self.path_to_freecad
+        # self.path_to_system_packages
+
     def prepare_freecad_import(self):
         """Prepare FreeCAD import."""
-        # append the FreeCAD path specified in addon preferences
         self.append_path(self.path_to_freecad)
         self.append_path(self.path_to_system_packages)
+    
+    def cleanup_freecad_import(self):
+        """Cleanup if nessesary."""
+        if self.appimage_mounted:
+            pass
+
 
     def handle_additonal_paths(self):
         """Prepare more paths for import."""
-        # append the FreeCAD path specified in addon preferences
         import FreeCAD
 
         path_base = FreeCAD.getResourceDir()  # noqa
@@ -2130,6 +2154,7 @@ class ImportFcstd(object):
             self.config["filename"] = filename
 
         try:
+            self.prepare_freecad_path()
             self.prepare_freecad_import()
             import FreeCAD
         except ModuleNotFoundError as e:
@@ -2137,10 +2162,10 @@ class ImportFcstd(object):
                 {"ERROR"},
                 "Unable to import the FreeCAD Python module. \n"
                 "\n"
-                "Make sure it is installed on your system \n"
+                "Make sure FreeCAD is installed on your system! \n"
                 "and compiled with Python3 (same version as Blender).\n"
-                "It must also be found by Python, \n"
-                "you might need to set its path in this Addon preferences "
+                "We tried to search for it - \n"
+                "but maybee its easier to set its path in this Addon preferences "
                 "(User preferences->Addons->expand this addon).\n"
                 "\n" + str(e),
             )
@@ -2148,6 +2173,8 @@ class ImportFcstd(object):
         except Exception as e:
             self.config["report"]({"ERROR"}, "Import Failed.\n" "\n" + str(e))
             return {"CANCELLED"}
+        finally:
+            self.cleanup_freecad_import()
 
         self.import_extras()
 
